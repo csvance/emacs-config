@@ -9,14 +9,19 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(custom-safe-themes
+   '("b23f3067e27a9940a563f1fb3bf455aabd0450cb02c3fa4ad43f75a583311216"
+     default))
  '(package-selected-packages
-   '(catppuccin-theme claude-code ibuffer-project julia-snail magit
-		      markdown-mode monet multiple-cursors vterm
+   '(catppuccin-theme claude-code dir-treeview ibuffer-project julia-mode
+		      julia-repl magit markdown-mode monet
+		      multiple-cursors protobuf-mode vterm
 		      window-purpose))
  '(package-vc-selected-packages
-   '((monet :url "https://github.com/stevemolitor/monet")
-     (claude-code :url
-		  "https://github.com/stevemolitor/claude-code.el"))))
+   '((claude-code :url "https://github.com/stevemolitor/claude-code.el")
+     (monet :url "https://github.com/stevemolitor/monet")
+     (julia-snail :url "https://github.com/csvance/julia-snail"
+		  :branch "multimedia-export"))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -36,18 +41,11 @@
 (require 'window-purpose)
 (purpose-mode)
 
-;; julia-snail
-(use-package julia-snail
-  :vc (:url "https://github.com/csvance/julia-snail" :branch "multimedia-export")
-  :ensure t
-  :hook (julia-mode . julia-snail-mode))
+;; julia-repl
+(require 'julia-repl)
+(add-hook 'julia-mode-hook 'julia-repl-mode) ;; always use minor mode
+(julia-repl-set-terminal-backend 'vterm)
 
-(setq julia-snail-multimedia-enable t)
-(setq julia-snail-multimedia-buffer-style :single-reuse)
-(setq julia-snail-multimedia-buffer-autoswitch t)
-(setq julia-snail-executable "~/.juliaup/bin/julia")
-(setq julia-snail-multimedia-export-enable t)
-(setq julia-snail-multimedia-export-path "~/Pictures/julia-snail")
 
 ;; claude-code
 (use-package inheritenv
@@ -72,11 +70,21 @@
 
 (setq claude-code-terminal-backend 'vterm)
 
+;; ReLint.jl LSP
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
                '(julia-mode . ("~/Git/ReLint.jl/build/bin/lsp"))))
-
 (add-hook 'julia-mode-hook 'eglot-ensure)
 
+;; Don't litter auto save files
+(setq auto-save-file-name-transforms
+      `((".*" "~/.emacs.d/auto-save-list/" t)))
+(setq make-backup-files nil)
+
+;; By default don't show permissions / file sizes
+(add-hook 'dired-mode-hook 'dired-hide-details-mode)
+
 (setq inhibit-startup-screen t)
-(dired default-directory)
+
+(require 'dir-treeview)
+(load-theme 'dir-treeview-pleasant t)

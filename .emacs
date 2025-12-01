@@ -9,19 +9,14 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(custom-safe-themes
-   '("b23f3067e27a9940a563f1fb3bf455aabd0450cb02c3fa4ad43f75a583311216"
-     default))
  '(package-selected-packages
-   '(catppuccin-theme claude-code dir-treeview ibuffer-project julia-mode
-		      julia-repl magit markdown-mode monet
-		      multiple-cursors protobuf-mode vterm
+   '(catppuccin-theme claude-code ibuffer-project julia-mode julia-repl
+		      magit markdown-mode monet multiple-cursors
+		      protobuf-mode treemacs treemacs-magit vterm
 		      window-purpose))
  '(package-vc-selected-packages
    '((claude-code :url "https://github.com/stevemolitor/claude-code.el")
-     (monet :url "https://github.com/stevemolitor/monet")
-     (julia-snail :url "https://github.com/csvance/julia-snail"
-		  :branch "multimedia-export"))))
+     (monet :url "https://github.com/stevemolitor/monet"))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -85,6 +80,3 @@
 (add-hook 'dired-mode-hook 'dired-hide-details-mode)
 
 (setq inhibit-startup-screen t)
-
-(require 'dir-treeview)
-(load-theme 'dir-treeview-pleasant t)

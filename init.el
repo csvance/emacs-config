@@ -20,7 +20,7 @@
 ;;   (setq revise-sync-default-host "user@repl-host")
 ;;   (setq revise-sync-projects '("~/Git/some-repo" ("~/Git/other-repo" . "other-host")))
 ;;   (setq my/vterm-sessions
-;;         '((:name "remote" :title "Remote tool" :key "<f6>" :menu "r"
+;;         '((:name "remote" :title "Remote tool" :key "<f6>" :menu "r" :mouse t
 ;;            :command "ssh -t user@host some-command")
 ;;           (:name "remote-shell" :title "Remote shell in a directory" :menu "s"
 ;;            :command "ssh -t user@host 'cd ~/some/dir && exec $SHELL -l'")))
@@ -29,7 +29,8 @@
 (defvar my/vterm-sessions nil
   "Persistent terminal sessions, as a list of plists.  Set in local.el.
 Each has :name (buffer *NAME*), :title (label in the F1 menu), :command, and
-optionally :key (a global key) and :menu (its key in the F1 menu).  Opening a
+optionally :key (a global key), :menu (its key in the F1 menu) and :mouse
+\(non-nil to forward clicks, for full-screen programs).  Opening a
 session switches to its buffer if open, else starts COMMAND in a new terminal.
 When COMMAND exits, the buffer closes.")
 (load (locate-user-emacs-file "local.el") 'noerror)
@@ -211,9 +212,10 @@ When COMMAND exits, the buffer closes.")
                                    (delq nil (mapcar (lambda (s) (plist-get s :key))
                                                      my/vterm-sessions))))
   :init
-  (defun my/vterm-session (name command)
+  (defun my/vterm-session (name command &optional mouse)
     "Switch to terminal *NAME* running COMMAND, starting it if needed.
-From inside that terminal, go back to the previous buffer."
+From inside that terminal, go back to the previous buffer.  With MOUSE
+non-nil, a new terminal forwards clicks to COMMAND (`my/vterm-mouse-mode')."
     (let ((buf (format "*%s*" name)))
       (cond ((equal (buffer-name) buf) (switch-to-buffer (other-buffer (current-buffer) t)))
             ((get-buffer buf) (switch-to-buffer buf))
@@ -221,11 +223,13 @@ From inside that terminal, go back to the previous buffer."
                (defvar vterm-shell)         ; bind vterm's option, not a local variable
                (let ((vterm-shell command)
                      (default-directory (expand-file-name "~/")))
-                 (vterm buf))))))
+                 (vterm buf)
+                 (when mouse (my/vterm-mouse-mode 1)))))))
   (defun my/vterm-session-command (session)
     "Return a command that opens SESSION, a plist from `my/vterm-sessions'."
     (lambda () (interactive)
-      (my/vterm-session (plist-get session :name) (plist-get session :command))))
+      (my/vterm-session (plist-get session :name) (plist-get session :command)
+                        (plist-get session :mouse))))
   (dolist (session my/vterm-sessions)
     (when-let* ((key (plist-get session :key)))
       (global-set-key (kbd key) (my/vterm-session-command session))))
@@ -249,7 +253,45 @@ With prefix argument NEW, always open another terminal."
                                            (directory-file-name default-directory)))))
         (if (and (not new) (get-buffer name))
             (switch-to-buffer name)
-          (vterm (if new (generate-new-buffer-name name) name)))))))
+          (vterm (if new (generate-new-buffer-name name) name))))))
+  :config
+  ;; vterm never passes the mouse to programs, so full-screen TUIs (multiplexers,
+  ;; agents) cannot see clicks.  This mode sends them as SGR mouse sequences.
+  ;; Only use it where the program enables mouse input; in a plain shell the
+  ;; sequences would arrive as typed text.
+  (defun my/vterm-mouse--cell (posn)
+    "Return the 1-based terminal (COLUMN . ROW) under mouse position POSN."
+    (with-current-buffer (window-buffer (posn-window posn))
+      (let ((col-row (posn-col-row posn t)))
+        (cons (max 1 (1+ (- (car col-row) (vterm--get-margin-width))))
+              (max 1 (1+ (+ (cdr col-row)
+                            (count-lines (point-min)
+                                         (window-start (posn-window posn))))))))))
+  (defun my/vterm-mouse--send (button posn final)
+    "Send mouse BUTTON at POSN to the terminal; FINAL is ?M (press) or ?m (release)."
+    (let ((cell (my/vterm-mouse--cell posn)))
+      (vterm-send-string (format "\e[<%d;%d;%d%c" button (car cell) (cdr cell) final))))
+  (defun my/vterm-mouse--handler (button final &optional end)
+    "Return a command that forwards BUTTON with FINAL; END uses the event's end."
+    (lambda (event)
+      (interactive "e")
+      (my/vterm-mouse--send button (if end (event-end event) (event-start event)) final)))
+  (define-minor-mode my/vterm-mouse-mode
+    "Forward mouse clicks and the wheel to the program running in this vterm."
+    :lighter " Mouse"
+    :keymap
+    (let ((map (make-sparse-keymap)))
+      (pcase-dolist (`(,button . ,n) '((1 . 0) (2 . 1) (3 . 2)))
+        (dolist (prefix '("" "double-" "triple-"))
+          (define-key map (vector (intern (format "%sdown-mouse-%d" prefix button)))
+                      (my/vterm-mouse--handler n ?M))
+          (define-key map (vector (intern (format "%smouse-%d" prefix button)))
+                      (my/vterm-mouse--handler n ?m t)))
+        (define-key map (vector (intern (format "drag-mouse-%d" button)))
+                    (my/vterm-mouse--handler n ?m t)))
+      (define-key map [wheel-up] (my/vterm-mouse--handler 64 ?M))
+      (define-key map [wheel-down] (my/vterm-mouse--handler 65 ?M))
+      map)))
 
 ;;;; Remote Revise watcher (revise-sync.el lives in ~/.emacs.d/lisp/)
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
@@ -297,7 +339,9 @@ With prefix argument NEW, always open another terminal."
     [["Sessions" :setup-children my/menu--sessions]
      ["Terminal"
       ("t" "Project terminal" my/project-vterm)
-      ("T" "New project terminal" (lambda () (interactive) (my/project-vterm t)))]]
+      ("T" "New project terminal" (lambda () (interactive) (my/project-vterm t)))
+      ("M" "Toggle mouse forwarding" my/vterm-mouse-mode
+       :if (lambda () (derived-mode-p 'vterm-mode)))]]
     [["Buffers"
       ("b" "Switch buffer" consult-buffer)
       ("B" "Buffer list by project" ibuffer)]

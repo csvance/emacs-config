@@ -20,7 +20,7 @@ A Magit-style menu of custom commands. Press `F1` (or `C-c m`), then the letter 
 |---|---|
 | Sessions | One letter per persistent terminal session in `my/vterm-sessions` (set in `local.el` with a `:menu` key) |
 | `b` / `B` | Switch buffer (with preview) / buffer list grouped by project |
-| `t` / `T` | Project terminal / new project terminal |
+| `t` / `T` / `M` | Project terminal / new project terminal / toggle mouse forwarding (in a terminal) |
 | `p` / `f` / `g` | Switch project / find file in project / Magit status |
 | `s` / `i` / `c` | Toggle sidebar / toggle type hints (language server buffers) / cheat sheet |
 | `r` / `R` | revise-sync watcher status / restart |
@@ -50,6 +50,7 @@ A full terminal emulator, good for SSH and TUI programs such as coding agents. K
 | `C-c C-c` | Send Ctrl+C to the program (a single `C-c` waits for a second key) |
 | `C-c C-g` | Send Ctrl+G to the program (`C-g` alone cancels in Emacs) |
 | `C-c C-l` | Clear the scrollback |
+| `F1 M` | Toggle mouse forwarding, so full-screen programs (multiplexers, agents) receive clicks and the wheel. Sessions can turn it on with `:mouse t`. Leave it off in a plain shell, where clicks would arrive as typed text |
 
 ## Magit
 

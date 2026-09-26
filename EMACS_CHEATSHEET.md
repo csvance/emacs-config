@@ -20,10 +20,22 @@ A Magit-style menu of custom commands. Press `F5`, then the letter shown; `C-g` 
 | Key | Action |
 |---|---|
 | Sessions | One letter per persistent terminal session in `my/vterm-sessions` (set in `local.el` with a `:menu` key) |
+| `b` / `B` | Switch buffer (with preview) / buffer list grouped by project |
 | `t` / `T` | Project terminal / new project terminal |
 | `p` / `f` / `g` | Switch project / find file in project / Magit status |
 | `s` / `h` / `c` | Toggle sidebar / toggle type hints (language server buffers) / cheat sheet |
 | `r` / `R` | revise-sync watcher status / restart |
+
+## Finding buffers
+
+Every prompt (`C-x b`, `M-x`, find file, switch project) shows a vertical list you narrow by typing. Type words in any order, separated by spaces: `vterm emacs` finds `*vterm: .emacs.d*`. Each entry shows its mode and folder on the right.
+
+| Key | Action |
+|---|---|
+| `C-x b` | Switch buffer; moving through the list previews each buffer, `RET` picks, `C-g` returns |
+| `C-x p b` | Same, limited to the current project's buffers |
+| `C-x C-b` | Buffer list grouped by project; `RET` opens, `d` then `x` closes buffers, `g` refreshes, `q` quits |
+| Up / Down | Move through any prompt's list |
 
 ## Terminal (vterm)
 
@@ -230,7 +242,7 @@ With CUA mode, the familiar keys work whenever text is selected.
 | Shift+arrows | Select text |
 | `C-x C-s` | Save |
 | `C-x C-f` | Open a file |
-| `C-x b` | Switch buffer |
+| `C-x b` | Switch buffer (see Finding buffers) |
 | `C-x k` | Close buffer |
 | `M-x recentf-open` | Open a recently used file |
 | `C-s` / `C-r` | Search forward / backward (repeat to jump) |

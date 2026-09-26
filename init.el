@@ -66,6 +66,26 @@ When COMMAND exits, the buffer closes.")
       '(not xref-find-definitions xref-find-definitions-other-window
             xref-find-definitions-other-frame xref-find-references))
 
+;;;; Completion: vertical, searchable prompts everywhere (M-x, C-x b, find file, ...)
+(use-package vertico                  ; show candidates as a vertical list
+  :init (vertico-mode 1))
+(use-package orderless                ; match space-separated words in any order
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-overrides '((file (styles basic partial-completion)))))
+(use-package marginalia               ; mode, folder and size next to each candidate
+  :init (marginalia-mode 1))
+(use-package consult                  ; buffer switching with live preview
+  :bind (("C-x b" . consult-buffer)
+         ("C-x p b" . consult-project-buffer)))
+
+;;;; Buffer list: C-x C-b shows all buffers grouped by project
+(global-set-key [remap list-buffers] #'ibuffer)
+(use-package ibuffer-project
+  :hook (ibuffer . (lambda ()
+                     (setq ibuffer-filter-groups (ibuffer-project-generate-filter-groups))
+                     (ibuffer-update nil t))))  ; redraw with the project groups
+
 ;;;; Languages
 (use-package julia-mode)
 (use-package go-mode)                 ; fallback if the tree-sitter grammar is missing
@@ -135,6 +155,11 @@ When COMMAND exits, the buffer closes.")
   :custom
   (project-switch-commands #'my/project-open-readme) ; no action menu
   :config
+  ;; Never treat the home directory itself as a project, even if a stray ~/.git appears
+  (advice-add 'project-try-vc :filter-return
+              (lambda (proj)
+                (unless (and proj (file-equal-p (project-root proj) "~/"))
+                  proj)))
   (dolist (dir my/projects)
     (when-let* ((proj (and (file-directory-p dir) (project-current nil dir))))
       (project-remember-project proj))))
@@ -206,14 +231,22 @@ From inside that terminal, go back to the previous buffer."
   (dolist (session my/vterm-sessions)
     (when-let* ((key (plist-get session :key)))
       (global-set-key (kbd key) (my/vterm-session-command session))))
+  (defun my/recent-project-root ()
+    "Root of the current buffer's project, else of the most recent buffer with one.
+Covers buffers outside any project, such as *scratch* or a remote session."
+    (seq-some (lambda (buf)
+                (with-current-buffer buf
+                  (unless (file-remote-p default-directory)
+                    (when-let* ((proj (project-current)))
+                      (project-root proj)))))
+              (cons (current-buffer) (buffer-list))))
   (defun my/project-vterm (&optional new)
     "Switch to the current project's terminal, or back from it.
 With prefix argument NEW, always open another terminal."
     (interactive "P")
     (if (and (derived-mode-p 'vterm-mode) (not new))
         (switch-to-buffer (other-buffer (current-buffer) t))
-      (let* ((proj (project-current))
-             (default-directory (if proj (project-root proj) default-directory))
+      (let* ((default-directory (or (my/recent-project-root) default-directory))
              (name (format "*vterm: %s*" (file-name-nondirectory
                                            (directory-file-name default-directory)))))
         (if (and (not new) (get-buffer name))
@@ -266,7 +299,10 @@ With prefix argument NEW, always open another terminal."
      ["Terminal"
       ("t" "Project terminal" my/project-vterm)
       ("T" "New project terminal" (lambda () (interactive) (my/project-vterm t)))]]
-    [["Project"
+    [["Buffers"
+      ("b" "Switch buffer" consult-buffer)
+      ("B" "Buffer list by project" ibuffer)]
+     ["Project"
       ("p" "Switch project" project-switch-project)
       ("f" "Find file in project" project-find-file)
       ("g" "Magit status" magit-status)]

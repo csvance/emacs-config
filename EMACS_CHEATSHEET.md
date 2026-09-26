@@ -6,16 +6,15 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 
 | Key | Action |
 |---|---|
-| `F5` | Personal menu: sessions and custom commands (see below) |
-| `F7` | Toggle inline type hints (in buffers with a language server) |
+| `F1` | Personal menu: sessions and custom commands (see below). Help is on `C-h` |
 | `F8` | Toggle the Treemacs sidebar |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |
 | `F12` | Open the project's terminal, or return to the previous buffer |
 
-## Personal menu (F5)
+## Personal menu (F1)
 
-A Magit-style menu of custom commands. Press `F5`, then the letter shown; `C-g` closes it. It works inside terminals too.
+A Magit-style menu of custom commands. Press `F1` (or `C-c m`), then the letter shown; `C-g` closes it. It works inside terminals too.
 
 | Key | Action |
 |---|---|
@@ -23,7 +22,7 @@ A Magit-style menu of custom commands. Press `F5`, then the letter shown; `C-g` 
 | `b` / `B` | Switch buffer (with preview) / buffer list grouped by project |
 | `t` / `T` | Project terminal / new project terminal |
 | `p` / `f` / `g` | Switch project / find file in project / Magit status |
-| `s` / `h` / `c` | Toggle sidebar / toggle type hints (language server buffers) / cheat sheet |
+| `s` / `i` / `c` | Toggle sidebar / toggle type hints (language server buffers) / cheat sheet |
 | `r` / `R` | revise-sync watcher status / restart |
 
 ## Finding buffers
@@ -39,7 +38,7 @@ Every prompt (`C-x b`, `M-x`, find file, switch project) shows a vertical list y
 
 ## Terminal (vterm)
 
-A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F5`, `F8`, `F9` and `F12` prefixes and any session keys.
+A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F8`, `F9` and `F12` prefixes and any session keys.
 
 | Key | Action |
 |---|---|
@@ -223,7 +222,7 @@ Works for Julia (JETLS) and Python (basedpyright). Shell, Go and Rust use tree-s
 | Ctrl+click | Go to definition |
 | Mouse back / forward buttons | Go back / forward |
 | `C-M-.` | Search for a symbol by name |
-| `F7` | Toggle inline type hints (`M-x eglot-inlay-hints-mode`) |
+| `F1 i` | Toggle inline type hints (`M-x eglot-inlay-hints-mode`) |
 | `M-x eglot-rename` | Rename symbol across the project |
 | `M-x eglot-code-actions` | Quick fixes and refactorings |
 | `M-x eglot-format` | Format the buffer or selection |

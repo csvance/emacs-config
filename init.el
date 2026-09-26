@@ -28,8 +28,8 @@
   "Project roots registered with project.el at startup.  Set in local.el.")
 (defvar my/vterm-sessions nil
   "Persistent terminal sessions, as a list of plists.  Set in local.el.
-Each has :name (buffer *NAME*), :title (label in the F5 menu), :command, and
-optionally :key (a global key) and :menu (its key in the F5 menu).  Opening a
+Each has :name (buffer *NAME*), :title (label in the F1 menu), :command, and
+optionally :key (a global key) and :menu (its key in the F1 menu).  Opening a
 session switches to its buffer if open, else starts COMMAND in a new terminal.
 When COMMAND exits, the buffer closes.")
 (load (locate-user-emacs-file "local.el") 'noerror)
@@ -119,8 +119,6 @@ When COMMAND exits, the buffer closes.")
   :ensure nil                         ; built in
   ;; Only Julia and Python get a language server; shell, Go and Rust use tree-sitter highlighting
   :hook ((julia-mode python-mode python-ts-mode) . eglot-ensure)
-  :bind (:map eglot-mode-map
-         ("<f7>" . eglot-inlay-hints-mode)) ; toggle inline type hints
   :config
   ;; JETLS instantiates package environments without asking (may update Manifest.toml)
   (setq-default eglot-workspace-configuration
@@ -209,7 +207,7 @@ When COMMAND exits, the buffer closes.")
   (vterm-max-scrollback 10000)
   ;; Keep these for Emacs instead of sending them to the terminal program
   (vterm-keymap-exceptions (append '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o" "C-y" "M-y"
-                                     "<f5>" "<f8>" "<f9>" "<f12>")
+                                     "<f1>" "<f8>" "<f9>" "<f12>")
                                    (delq nil (mapcar (lambda (s) (plist-get s :key))
                                                      my/vterm-sessions))))
   :init
@@ -282,9 +280,10 @@ With prefix argument NEW, always open another terminal."
       (find-file file))))
 (global-set-key (kbd "<f9>") #'my/toggle-cheatsheet)
 
-;;;; Personal menu: F5 lists sessions and custom commands (a Magit-style Transient menu)
+;;;; Personal menu: F1 lists sessions and custom commands (a Magit-style Transient menu)
 (use-package transient
-  :bind ("<f5>" . my/menu)
+  :bind (("<f1>" . my/menu)               ; F1 replaces the help prefix; C-h still opens help
+         ("C-c m" . my/menu))             ; C-c <letter> is reserved for user bindings
   :config
   (defun my/menu--sessions (_children)
     "Menu entries for the sessions in `my/vterm-sessions' that have a :menu key."
@@ -308,7 +307,7 @@ With prefix argument NEW, always open another terminal."
       ("g" "Magit status" magit-status)]
      ["View"
       ("s" "Toggle sidebar" treemacs)
-      ("h" "Toggle type hints" eglot-inlay-hints-mode
+      ("i" "Toggle type hints" eglot-inlay-hints-mode
        :if (lambda () (bound-and-true-p eglot--managed-mode)))
       ("c" "Cheat sheet" my/toggle-cheatsheet)]
      ["Revise"

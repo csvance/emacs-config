@@ -1,0 +1,30 @@
+# Machine-specific settings
+local.el
+custom.el
+
+# State Emacs writes at runtime
+projects
+recentf
+auto-save-list/
+.cache/
+transient/
+eshell/
+url/
+tramp
+bookmarks
+history
+places
+network-security.data
+*~
+\#*#
+.#*
+
+# Installed or compiled, rebuilt on each machine
+elpa/
+eln-cache/
+tree-sitter/
+*.elc
+
+# Session notes
+HANDOFF.md
+agent/

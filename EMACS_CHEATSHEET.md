@@ -10,6 +10,22 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 | `F8` | Toggle the Treemacs sidebar |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |
+| `F12` | Open the project's terminal, or return to the previous buffer |
+
+## Terminal (vterm)
+
+A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F8`, `F9` and `F12` prefixes.
+
+| Key | Action |
+|---|---|
+| `F12` | Open the project's terminal (in the project root), or go back |
+| `C-u F12` | Open another terminal for the same project |
+| Session keys | Keys set in `my/vterm-sessions` (in `local.el`) open a persistent terminal running a fixed command, such as an SSH session; press again to return, and it reopens if the command exits |
+| `C-S-v` | Paste |
+| `C-c C-t` | Copy mode: move and select with the usual keys, `RET` copies and exits |
+| `C-c C-c` | Send Ctrl+C to the program (a single `C-c` waits for a second key) |
+| `C-c C-g` | Send Ctrl+G to the program (`C-g` alone cancels in Emacs) |
+| `C-c C-l` | Clear the scrollback |
 
 ## Magit
 

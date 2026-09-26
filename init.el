@@ -19,8 +19,13 @@
 ;;   (setq my/projects '("~/Git/some-repo" "~/Git/other-repo"))
 ;;   (setq revise-sync-default-host "user@repl-host")
 ;;   (setq revise-sync-projects '("~/Git/some-repo" ("~/Git/other-repo" . "other-host")))
+;;   (setq my/vterm-sessions '(("<f6>" "remote" "ssh -t user@host some-command")))
 (defvar my/projects nil
   "Project roots registered with project.el at startup.  Set in local.el.")
+(defvar my/vterm-sessions nil
+  "Persistent terminal sessions, as a list of (KEY NAME COMMAND).  Set in local.el.
+KEY opens a terminal buffer *NAME* running COMMAND, or switches to it if it
+is already open.  When COMMAND exits, the buffer closes.")
 (load (locate-user-emacs-file "local.el") 'noerror)
 
 ;;;; Familiar editing behavior
@@ -160,6 +165,49 @@
 
 (use-package treemacs-magit
   :after (treemacs magit))
+
+;;;; Terminal: F12 opens a terminal in the project root (C-u F12 for another one)
+;; vterm compiles a native module on first load; needs cmake, libtool-bin and libvterm-dev.
+(use-package vterm
+  :commands vterm
+  :bind (("<f12>" . my/project-vterm)
+         :map vterm-mode-map
+         ("C-S-v" . vterm-yank))          ; paste, as in other terminals
+  :custom
+  (vterm-always-compile-module t)         ; build the module without asking
+  (vterm-max-scrollback 10000)
+  ;; Keep these for Emacs instead of sending them to the terminal program
+  (vterm-keymap-exceptions (append '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o" "C-y" "M-y"
+                                     "<f8>" "<f9>" "<f12>")
+                                   (mapcar #'car my/vterm-sessions)))
+  :init
+  (defun my/vterm-session (name command)
+    "Switch to terminal *NAME* running COMMAND, starting it if needed.
+From inside that terminal, go back to the previous buffer."
+    (let ((buf (format "*%s*" name)))
+      (cond ((equal (buffer-name) buf) (switch-to-buffer (other-buffer (current-buffer) t)))
+            ((get-buffer buf) (switch-to-buffer buf))
+            (t (require 'vterm)
+               (defvar vterm-shell)         ; bind vterm's option, not a local variable
+               (let ((vterm-shell command)
+                     (default-directory (expand-file-name "~/")))
+                 (vterm buf))))))
+  (dolist (session my/vterm-sessions)
+    (pcase-let ((`(,key ,name ,command) session))
+      (global-set-key (kbd key) (lambda () (interactive) (my/vterm-session name command)))))
+  (defun my/project-vterm (&optional new)
+    "Switch to the current project's terminal, or back from it.
+With prefix argument NEW, always open another terminal."
+    (interactive "P")
+    (if (and (derived-mode-p 'vterm-mode) (not new))
+        (switch-to-buffer (other-buffer (current-buffer) t))
+      (let* ((proj (project-current))
+             (default-directory (if proj (project-root proj) default-directory))
+             (name (format "*vterm: %s*" (file-name-nondirectory
+                                           (directory-file-name default-directory)))))
+        (if (and (not new) (get-buffer name))
+            (switch-to-buffer name)
+          (vterm (if new (generate-new-buffer-name name) name)))))))
 
 ;;;; Remote Revise watcher (revise-sync.el lives in ~/.emacs.d/lisp/)
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))

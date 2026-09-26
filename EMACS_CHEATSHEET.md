@@ -227,7 +227,7 @@ If a selection is active and you need a `C-x` command (such as `C-x C-s`), press
 | `M-x revise-sync-restart` | Restart the watcher for the current project |
 | `M-x revise-sync-stop-all` | Stop every watcher |
 
-Watcher output appears in buffers named like `*revise-sync:MyProject.jl*`. Projects, hosts and the script command are set in the `revise-sync` block of `init.el`.
+Opening a file in a configured project starts `bin/revise-watch.sh` for it, which forwards each saved `.jl` file to the REPL host as a `touch` so Revise picks it up. Closing the project's last buffer stops it. Output appears in buffers named like `*revise-sync:MyProject.jl*`, one `touched` line per save. Projects and the host are set in `local.el`.
 
 ### One-time setup commands
 

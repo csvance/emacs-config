@@ -11,9 +11,7 @@
 ;;;; Machine-specific settings (local.el is not checked in)
 ;; Example local.el:
 ;;   (setq my/projects '("~/Git/some-repo" "~/Git/other-repo"))
-;;   ;; %h = host, %p = project directory, %n = project name
-;;   (setq revise-sync-command '("~/bin/revise-watch.sh" "%h" "%p"))
-;;   (setq revise-sync-default-host "my-remote-host")
+;;   (setq revise-sync-default-host "user@repl-host")
 ;;   (setq revise-sync-projects '("~/Git/some-repo" ("~/Git/other-repo" . "other-host")))
 (defvar my/projects nil
   "Project roots registered with project.el at startup.  Set in local.el.")
@@ -153,7 +151,10 @@
 ;;;; Remote Revise watcher (revise-sync.el lives in ~/.emacs.d/lisp/)
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
 (use-package revise-sync
-  :ensure nil                         ; command, host and projects are set in local.el
+  :ensure nil                         ; host and projects are set in local.el
+  :custom
+  ;; %h = host, %p = project directory, %n = project name
+  (revise-sync-command (list (locate-user-emacs-file "bin/revise-watch.sh") "%h" "%p"))
   :config
   (revise-sync-mode 1))
 

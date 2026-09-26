@@ -8,6 +8,12 @@
 (require 'use-package-ensure)         ; needed for always-ensure to take effect
 (setq use-package-always-ensure t)   ; install missing packages automatically
 
+;;;; Theme (first, so the rest of startup is already themed)
+(use-package catppuccin-theme
+  :config
+  (setq catppuccin-flavor 'mocha)     ; options: latte, frappe, macchiato, mocha
+  (load-theme 'catppuccin t))
+
 ;;;; Machine-specific settings (local.el is not checked in)
 ;; Example local.el:
 ;;   (setq my/projects '("~/Git/some-repo" "~/Git/other-repo"))
@@ -48,12 +54,6 @@
 (setq xref-prompt-for-identifier
       '(not xref-find-definitions xref-find-definitions-other-window
             xref-find-definitions-other-frame xref-find-references))
-
-;;;; Theme
-(use-package catppuccin-theme
-  :config
-  (setq catppuccin-flavor 'mocha)     ; options: latte, frappe, macchiato, mocha
-  (load-theme 'catppuccin t))
 
 ;;;; Languages
 (use-package julia-mode)
@@ -111,8 +111,18 @@
 ;;;; Projects: switch with C-x p p; the Treemacs sidebar follows the current one
 (use-package project
   :ensure nil                         ; built in
+  :init
+  (defun my/project-open-readme ()
+    "Open the current project's README, or its root directory if it has none."
+    (interactive)
+    (let* ((root (project-root (project-current t)))
+           (readme (seq-find #'file-regular-p
+                             (mapcar (lambda (f) (expand-file-name f root))
+                                     '("README.md" "readme.md" "README.org"
+                                       "README.rst" "README.txt" "README")))))
+      (if readme (find-file readme) (project-dired))))
   :custom
-  (project-switch-commands #'project-dired) ; open the project root, no action menu
+  (project-switch-commands #'my/project-open-readme) ; no action menu
   :config
   (dolist (dir my/projects)
     (when-let* ((proj (and (file-directory-p dir) (project-current nil dir))))

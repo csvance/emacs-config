@@ -6,15 +6,28 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 
 | Key | Action |
 |---|---|
+| `F5` | Personal menu: sessions and custom commands (see below) |
 | `F7` | Toggle inline type hints (in buffers with a language server) |
 | `F8` | Toggle the Treemacs sidebar |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |
 | `F12` | Open the project's terminal, or return to the previous buffer |
 
+## Personal menu (F5)
+
+A Magit-style menu of custom commands. Press `F5`, then the letter shown; `C-g` closes it. It works inside terminals too.
+
+| Key | Action |
+|---|---|
+| Sessions | One letter per persistent terminal session in `my/vterm-sessions` (set in `local.el` with a `:menu` key) |
+| `t` / `T` | Project terminal / new project terminal |
+| `p` / `f` / `g` | Switch project / find file in project / Magit status |
+| `s` / `h` / `c` | Toggle sidebar / toggle type hints (language server buffers) / cheat sheet |
+| `r` / `R` | revise-sync watcher status / restart |
+
 ## Terminal (vterm)
 
-A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F8`, `F9` and `F12` prefixes.
+A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F5`, `F8`, `F9` and `F12` prefixes and any session keys.
 
 | Key | Action |
 |---|---|

@@ -19,13 +19,19 @@
 ;;   (setq my/projects '("~/Git/some-repo" "~/Git/other-repo"))
 ;;   (setq revise-sync-default-host "user@repl-host")
 ;;   (setq revise-sync-projects '("~/Git/some-repo" ("~/Git/other-repo" . "other-host")))
-;;   (setq my/vterm-sessions '(("<f6>" "remote" "ssh -t user@host some-command")))
+;;   (setq my/vterm-sessions
+;;         '((:name "remote" :title "Remote tool" :key "<f6>" :menu "r"
+;;            :command "ssh -t user@host some-command")
+;;           (:name "remote-shell" :title "Remote shell in a directory" :menu "s"
+;;            :command "ssh -t user@host 'cd ~/some/dir && exec $SHELL -l'")))
 (defvar my/projects nil
   "Project roots registered with project.el at startup.  Set in local.el.")
 (defvar my/vterm-sessions nil
-  "Persistent terminal sessions, as a list of (KEY NAME COMMAND).  Set in local.el.
-KEY opens a terminal buffer *NAME* running COMMAND, or switches to it if it
-is already open.  When COMMAND exits, the buffer closes.")
+  "Persistent terminal sessions, as a list of plists.  Set in local.el.
+Each has :name (buffer *NAME*), :title (label in the F5 menu), :command, and
+optionally :key (a global key) and :menu (its key in the F5 menu).  Opening a
+session switches to its buffer if open, else starts COMMAND in a new terminal.
+When COMMAND exits, the buffer closes.")
 (load (locate-user-emacs-file "local.el") 'noerror)
 
 ;;;; Familiar editing behavior
@@ -178,8 +184,9 @@ is already open.  When COMMAND exits, the buffer closes.")
   (vterm-max-scrollback 10000)
   ;; Keep these for Emacs instead of sending them to the terminal program
   (vterm-keymap-exceptions (append '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o" "C-y" "M-y"
-                                     "<f8>" "<f9>" "<f12>")
-                                   (mapcar #'car my/vterm-sessions)))
+                                     "<f5>" "<f8>" "<f9>" "<f12>")
+                                   (delq nil (mapcar (lambda (s) (plist-get s :key))
+                                                     my/vterm-sessions))))
   :init
   (defun my/vterm-session (name command)
     "Switch to terminal *NAME* running COMMAND, starting it if needed.
@@ -192,9 +199,13 @@ From inside that terminal, go back to the previous buffer."
                (let ((vterm-shell command)
                      (default-directory (expand-file-name "~/")))
                  (vterm buf))))))
+  (defun my/vterm-session-command (session)
+    "Return a command that opens SESSION, a plist from `my/vterm-sessions'."
+    (lambda () (interactive)
+      (my/vterm-session (plist-get session :name) (plist-get session :command))))
   (dolist (session my/vterm-sessions)
-    (pcase-let ((`(,key ,name ,command) session))
-      (global-set-key (kbd key) (lambda () (interactive) (my/vterm-session name command)))))
+    (when-let* ((key (plist-get session :key)))
+      (global-set-key (kbd key) (my/vterm-session-command session))))
   (defun my/project-vterm (&optional new)
     "Switch to the current project's terminal, or back from it.
 With prefix argument NEW, always open another terminal."
@@ -237,5 +248,35 @@ With prefix argument NEW, always open another terminal."
         (switch-to-buffer (other-buffer (current-buffer) t))
       (find-file file))))
 (global-set-key (kbd "<f9>") #'my/toggle-cheatsheet)
+
+;;;; Personal menu: F5 lists sessions and custom commands (a Magit-style Transient menu)
+(use-package transient
+  :bind ("<f5>" . my/menu)
+  :config
+  (defun my/menu--sessions (_children)
+    "Menu entries for the sessions in `my/vterm-sessions' that have a :menu key."
+    (transient-parse-suffixes
+     'my/menu
+     (mapcar (lambda (s)
+               (list (plist-get s :menu) (plist-get s :title) (my/vterm-session-command s)))
+             (seq-filter (lambda (s) (plist-get s :menu)) my/vterm-sessions))))
+  (transient-define-prefix my/menu ()
+    "Personal command menu."
+    [["Sessions" :setup-children my/menu--sessions]
+     ["Terminal"
+      ("t" "Project terminal" my/project-vterm)
+      ("T" "New project terminal" (lambda () (interactive) (my/project-vterm t)))]]
+    [["Project"
+      ("p" "Switch project" project-switch-project)
+      ("f" "Find file in project" project-find-file)
+      ("g" "Magit status" magit-status)]
+     ["View"
+      ("s" "Toggle sidebar" treemacs)
+      ("h" "Toggle type hints" eglot-inlay-hints-mode
+       :if (lambda () (bound-and-true-p eglot--managed-mode)))
+      ("c" "Cheat sheet" my/toggle-cheatsheet)]
+     ["Revise"
+      ("r" "Watcher status" revise-sync-status)
+      ("R" "Restart watcher" revise-sync-restart)]]))
 
 ;;; init.el ends here

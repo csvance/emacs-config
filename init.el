@@ -130,7 +130,11 @@
 
 ;;;; Magit
 (use-package magit
-  :bind ("C-x g" . magit-status))
+  :bind ("C-x g" . magit-status)
+  :config
+  ;; List all worktrees (e.g. ones agents create) below the status headers
+  (magit-add-section-hook 'magit-status-sections-hook
+                          'magit-insert-worktrees 'magit-insert-status-headers t))
 
 ;;;; File browser
 ;; After first launch, run M-x nerd-icons-install-fonts once, then restart.

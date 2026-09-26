@@ -75,6 +75,18 @@ To stage only a few lines, expand the file with `TAB`, select the lines with Shi
 
 Typical new branch workflow: `b c` to create the branch, make changes, `s` to stage, `c c` then `C-c C-c` to commit, `P u` to push and set the upstream.
 
+### Worktrees
+
+The status buffer lists every worktree under **Worktrees** when there is more than one. `RET` on a worktree opens its status, `k` deletes it (asks first).
+
+| Key | Action |
+|---|---|
+| `Z b` | New worktree for an existing branch or commit |
+| `Z c` | New branch and a worktree for it |
+| `Z g` | Visit another worktree's status |
+| `Z m` | Move a worktree |
+| `Z k` | Delete a worktree |
+
 ### History, diffs and more
 
 | Key | Action |

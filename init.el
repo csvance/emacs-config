@@ -97,6 +97,15 @@
   ;; JETLS instantiates package environments without asking (may update Manifest.toml)
   (setq-default eglot-workspace-configuration
                 '(:jetls (:full_analysis (:auto_instantiate "always"))))
+  ;; JETLS can analyze the first file before it has read the setting above and
+  ;; still ask, so answer its "Instantiate it now?" question automatically.
+  (cl-defmethod eglot-handle-request :around
+    (_server (_method (eql window/showMessageRequest)) &key message actions &allow-other-keys)
+    (if (and (stringp message)
+             (string-match-p "Instantiate it now\\?" message)
+             (seq-find (lambda (a) (equal (plist-get a :title) "Instantiate")) actions))
+        '(:title "Instantiate")
+      (cl-call-next-method)))
   (add-to-list 'eglot-server-programs
                '(((julia-mode :language-id "julia")
                   (julia-ts-mode :language-id "julia"))

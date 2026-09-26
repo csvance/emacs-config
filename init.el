@@ -86,9 +86,8 @@
 ;;;; Eglot: JETLS for Julia; other servers found automatically
 (use-package eglot
   :ensure nil                         ; built in
-  :hook ((julia-mode python-mode python-ts-mode
-          go-mode go-ts-mode rust-mode rust-ts-mode
-          sh-mode bash-ts-mode) . eglot-ensure)
+  ;; Only Julia and Python get a language server; shell, Go and Rust use tree-sitter highlighting
+  :hook ((julia-mode python-mode python-ts-mode) . eglot-ensure)
   :bind (:map eglot-mode-map
          ("<f7>" . eglot-inlay-hints-mode)) ; toggle inline type hints
   :config

@@ -160,7 +160,7 @@ Works in any file buffer, no sidebar needed. Uses Git to list files, so it stays
 
 ## Code navigation (Eglot)
 
-Works for Julia (JETLS), Python, Go, Rust and shell once the language servers are installed.
+Works for Julia (JETLS) and Python (basedpyright). Shell, Go and Rust use tree-sitter highlighting only, with no language server.
 
 | Key | Action |
 |---|---|

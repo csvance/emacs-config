@@ -20,7 +20,7 @@
 ;;   (setq revise-sync-default-host "user@repl-host")
 ;;   (setq revise-sync-projects '("~/Git/some-repo" ("~/Git/other-repo" . "other-host")))
 ;;   (setq my/vterm-sessions
-;;         '((:name "remote" :title "Remote tool" :key "<f6>" :menu "r" :mouse t
+;;         '((:name "remote" :title "Remote tool" :key "<f6>" :menu "r"
 ;;            :command "ssh -t user@host some-command")
 ;;           (:name "remote-shell" :title "Remote shell in a directory" :menu "s"
 ;;            :command "ssh -t user@host 'cd ~/some/dir && exec $SHELL -l'")))
@@ -29,8 +29,7 @@
 (defvar my/vterm-sessions nil
   "Persistent terminal sessions, as a list of plists.  Set in local.el.
 Each has :name (buffer *NAME*), :title (label in the F1 menu), :command, and
-optionally :key (a global key), :menu (its key in the F1 menu) and :mouse
-\(non-nil to forward clicks, for full-screen programs).  Opening a
+optionally :key (a global key) and :menu (its key in the F1 menu).  Opening a
 session switches to its buffer if open, else starts COMMAND in a new terminal.
 When COMMAND exits, the buffer closes.")
 (load (locate-user-emacs-file "local.el") 'noerror)
@@ -206,16 +205,19 @@ When COMMAND exits, the buffer closes.")
   :custom
   (vterm-always-compile-module t)         ; build the module without asking
   (vterm-max-scrollback 10000)
+  (vterm-min-window-width 20)             ; fit side-by-side windows (default 80 overflows)
+  ;; Let programs set the kill ring and clipboard (OSC 52), as Claude Code does
+  ;; when you select text with the mouse; they cannot read it back
+  (vterm-enable-manipulate-selection-data-by-osc52 t)
   ;; Keep these for Emacs instead of sending them to the terminal program
   (vterm-keymap-exceptions (append '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o" "C-y" "M-y"
                                      "<f1>" "<f8>" "<f9>" "<f12>")
                                    (delq nil (mapcar (lambda (s) (plist-get s :key))
                                                      my/vterm-sessions))))
   :init
-  (defun my/vterm-session (name command &optional mouse)
+  (defun my/vterm-session (name command)
     "Switch to terminal *NAME* running COMMAND, starting it if needed.
-From inside that terminal, go back to the previous buffer.  With MOUSE
-non-nil, a new terminal forwards clicks to COMMAND (`my/vterm-mouse-mode')."
+From inside that terminal, go back to the previous buffer."
     (let ((buf (format "*%s*" name)))
       (cond ((equal (buffer-name) buf) (switch-to-buffer (other-buffer (current-buffer) t)))
             ((get-buffer buf) (switch-to-buffer buf))
@@ -223,13 +225,11 @@ non-nil, a new terminal forwards clicks to COMMAND (`my/vterm-mouse-mode')."
                (defvar vterm-shell)         ; bind vterm's option, not a local variable
                (let ((vterm-shell command)
                      (default-directory (expand-file-name "~/")))
-                 (vterm buf)
-                 (when mouse (my/vterm-mouse-mode 1)))))))
+                 (vterm buf))))))
   (defun my/vterm-session-command (session)
     "Return a command that opens SESSION, a plist from `my/vterm-sessions'."
     (lambda () (interactive)
-      (my/vterm-session (plist-get session :name) (plist-get session :command)
-                        (plist-get session :mouse))))
+      (my/vterm-session (plist-get session :name) (plist-get session :command))))
   (dolist (session my/vterm-sessions)
     (when-let* ((key (plist-get session :key)))
       (global-set-key (kbd key) (my/vterm-session-command session))))
@@ -255,43 +255,170 @@ With prefix argument NEW, always open another terminal."
             (switch-to-buffer name)
           (vterm (if new (generate-new-buffer-name name) name))))))
   :config
-  ;; vterm never passes the mouse to programs, so full-screen TUIs (multiplexers,
-  ;; agents) cannot see clicks.  This mode sends them as SGR mouse sequences.
-  ;; Only use it where the program enables mouse input; in a plain shell the
-  ;; sequences would arrive as typed text.
+  ;; vterm never passes the mouse to programs, so full-screen TUIs (agents,
+  ;; multiplexers) cannot see clicks.  Watch the program's output for the
+  ;; sequences that turn mouse reporting on and off, and while it is on, report
+  ;; clicks, drags and the wheel as SGR sequences, as a real terminal would.
+  ;; Elsewhere, such as at a shell prompt, the mouse keeps its Emacs behavior.
+  (defvar-local my/vterm--mouse-modes nil
+    "Mouse reporting modes the program has turned on (1000, 1002, 1003, 1006).")
+  (defvar-local my/vterm--output-tail ""
+    "End of the previous output, in case a mode sequence was split across two.")
+  (defvar-local my/vterm--rows nil
+    "Height of the terminal screen in rows.")
+  (defun my/vterm--track-mouse-modes (process output)
+    "Record the mouse reporting modes that OUTPUT from PROCESS turns on or off."
+    (when-let* ((buf (process-buffer process))
+                ((buffer-live-p buf)))
+      (with-current-buffer buf
+        (let ((text (concat my/vterm--output-tail output))
+              (start 0))
+          ;; DECSET/DECRST (ESC [ ? N h, ESC [ ? N l) or a full reset (ESC c)
+          (while (string-match "\e\\(?:\\[\\?\\([0-9;]+\\)\\([hl]\\)\\|c\\)" text start)
+            (if (not (match-beginning 1))
+                (setq my/vterm--mouse-modes nil)
+              (dolist (mode (mapcar #'string-to-number (split-string (match-string 1 text) ";")))
+                (when (memq mode '(1000 1002 1003 1006))
+                  (setq my/vterm--mouse-modes (delq mode my/vterm--mouse-modes))
+                  (when (equal (match-string 2 text) "h")
+                    (push mode my/vterm--mouse-modes)))))
+            (setq start (match-end 0)))
+          (setq my/vterm--output-tail (substring output (max 0 (- (length output) 16))))))))
+  (advice-add 'vterm--filter :before #'my/vterm--track-mouse-modes)
+  (defun my/vterm--record-size (resize process windows)
+    "Call RESIZE with PROCESS and WINDOWS, remembering the screen height it sets."
+    (let ((size (funcall resize process windows)))
+      (when (and size (processp process) (buffer-live-p (process-buffer process)))
+        (with-current-buffer (process-buffer process)
+          (setq my/vterm--rows (cdr size))))
+      size))
+  (advice-add 'vterm--window-adjust-process-window-size :around #'my/vterm--record-size)
+  (defun my/vterm--screen-start ()
+    "Position of the terminal screen's top row in the current vterm buffer.
+The screen is the last `my/vterm--rows' lines, followed by one empty line;
+everything above it is scrollback."
+    (save-excursion
+      (goto-char (point-max))
+      (forward-line (- (or my/vterm--rows (window-body-height))))
+      (point)))
+  (defun my/vterm-mouse--active-p ()
+    "Non-nil when the program in this terminal wants SGR mouse reports."
+    (and (bound-and-true-p my/vterm-mouse-mode)
+         (not vterm-copy-mode)
+         (memq 1006 my/vterm--mouse-modes)
+         (seq-some (lambda (mode) (memq mode my/vterm--mouse-modes)) '(1000 1002 1003))))
   (defun my/vterm-mouse--cell (posn)
-    "Return the 1-based terminal (COLUMN . ROW) under mouse position POSN."
+    "Return the 1-based terminal (COLUMN . ROW) under mouse position POSN.
+Counts buffer lines and columns rather than pixels, since lines drawn with a
+fallback font can be taller or narrower than the rest."
     (with-current-buffer (window-buffer (posn-window posn))
-      (let ((col-row (posn-col-row posn t)))
-        (cons (max 1 (1+ (- (car col-row) (vterm--get-margin-width))))
-              (max 1 (1+ (+ (cdr col-row)
-                            (count-lines (point-min)
-                                         (window-start (posn-window posn))))))))))
+      (save-excursion
+        (goto-char (or (posn-point posn) (point-max)))
+        (let ((row (- (line-number-at-pos) (line-number-at-pos (my/vterm--screen-start)) -1))
+              ;; Past the end of a line there is no text; count cells from the pixels
+              (col (if (and (eolp) (> (car (posn-col-row posn t)) (current-column)))
+                       (- (car (posn-col-row posn t)) (vterm--get-margin-width))
+                     (current-column))))
+          (cons (1+ col)
+                (max 1 (min row (or my/vterm--rows row))))))))
   (defun my/vterm-mouse--send (button posn final)
-    "Send mouse BUTTON at POSN to the terminal; FINAL is ?M (press) or ?m (release)."
+    "Report mouse BUTTON at POSN to the program; FINAL is ?M (press) or ?m (release)."
     (let ((cell (my/vterm-mouse--cell posn)))
-      (vterm-send-string (format "\e[<%d;%d;%d%c" button (car cell) (cdr cell) final))))
-  (defun my/vterm-mouse--handler (button final &optional end)
-    "Return a command that forwards BUTTON with FINAL; END uses the event's end."
+      (with-current-buffer (window-buffer (posn-window posn))
+        ;; One write, so the program cannot mistake the leading ESC for the Escape key
+        (process-send-string vterm--process (format "\e[<%d;%d;%d%c" button
+                                                    (car cell) (cdr cell) final)))))
+  (defun my/vterm-mouse--press (button)
+    "Return a command that reports a press of BUTTON, the drag, then the release."
     (lambda (event)
       (interactive "e")
-      (my/vterm-mouse--send button (if end (event-end event) (event-start event)) final)))
+      (let* ((posn (event-start event))
+             (win (posn-window posn))
+             (cell (my/vterm-mouse--cell posn))
+             ev)
+        (select-window win)
+        (my/vterm-mouse--send button posn ?M)
+        ;; Report motion while the button is held, for dragging pane borders or
+        ;; selecting text, if the program asked for it (modes 1002 and 1003)
+        (track-mouse
+          (while (mouse-movement-p (setq ev (read-event)))
+            (let ((pos (event-start ev)))
+              (when (and (eq (posn-window pos) win)
+                         (seq-some (lambda (mode) (memq mode my/vterm--mouse-modes)) '(1002 1003))
+                         (not (equal cell (my/vterm-mouse--cell pos))))
+                (setq posn pos
+                      cell (my/vterm-mouse--cell pos))
+                (my/vterm-mouse--send (+ 32 button) pos ?M)))))
+        (if (and (memq (event-basic-type ev) '(mouse-1 mouse-2 mouse-3))
+                 (not (memq 'down (event-modifiers ev))))
+            (my/vterm-mouse--send button (if (eq (posn-window (event-end ev)) win)
+                                             (event-end ev)
+                                           posn)
+                                  ?m)
+          ;; Something other than the release (a key): release here, then handle it
+          (my/vterm-mouse--send button posn ?m)
+          (push ev unread-command-events)))))
+  (defun my/vterm-mouse--wheel (button)
+    "Return a command that reports wheel BUTTON (64 up, 65 down)."
+    (lambda (event)
+      (interactive "e")
+      (my/vterm-mouse--send button (event-start event) ?M)))
+  (defun my/vterm-mouse--filter (command)
+    "Return COMMAND while the program wants mouse reports, else nil (Emacs handles it)."
+    (and (my/vterm-mouse--active-p) command))
   (define-minor-mode my/vterm-mouse-mode
-    "Forward mouse clicks and the wheel to the program running in this vterm."
-    :lighter " Mouse"
+    "Forward the mouse to the program in this terminal whenever it asks for it.
+On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
+    :lighter (:eval (when (my/vterm-mouse--active-p) " Mouse"))
     :keymap
     (let ((map (make-sparse-keymap)))
-      (pcase-dolist (`(,button . ,n) '((1 . 0) (2 . 1) (3 . 2)))
+      (cl-flet ((bind (event command)
+                  (define-key map (vector event)
+                              `(menu-item "" ,command :filter my/vterm-mouse--filter))))
+        (pcase-dolist (`(,n . ,button) '((1 . 0) (2 . 1) (3 . 2)))
+          (dolist (prefix '("" "double-" "triple-"))
+            (bind (intern (format "%sdown-mouse-%d" prefix n)) (my/vterm-mouse--press button))
+            ;; The press command already reported the release
+            (bind (intern (format "%smouse-%d" prefix n)) #'ignore))
+          (bind (intern (format "drag-mouse-%d" n)) #'ignore))
+        ;; Fast scrolling sends double-/triple- wheel events; forward those too
         (dolist (prefix '("" "double-" "triple-"))
-          (define-key map (vector (intern (format "%sdown-mouse-%d" prefix button)))
-                      (my/vterm-mouse--handler n ?M))
-          (define-key map (vector (intern (format "%smouse-%d" prefix button)))
-                      (my/vterm-mouse--handler n ?m t)))
-        (define-key map (vector (intern (format "drag-mouse-%d" button)))
-                    (my/vterm-mouse--handler n ?m t)))
-      (define-key map [wheel-up] (my/vterm-mouse--handler 64 ?M))
-      (define-key map [wheel-down] (my/vterm-mouse--handler 65 ?M))
-      map)))
+          (bind (intern (concat prefix "wheel-up")) (my/vterm-mouse--wheel 64))
+          (bind (intern (concat prefix "wheel-down")) (my/vterm-mouse--wheel 65))))
+      map))
+  (add-hook 'vterm-mode-hook
+            (lambda ()
+              (setq my/vterm--rows (window-body-height)) ; the size vterm starts with
+              ;; Box-drawing characters (TUI borders) draw slightly past their line,
+              ;; so Emacs takes the cursor's line for cut off and scrolls one line,
+              ;; hiding the screen's top row (such as a tab bar)
+              (setq-local make-cursor-line-fully-visible nil)
+              (my/vterm-mouse-mode 1)))
+  ;; When the program is not asking for the mouse, the wheel scrolls the
+  ;; scrollback in Emacs, but the program's redraws keep jumping the view back
+  ;; to the bottom.  Scrolling up freezes the terminal in copy mode; scrolling
+  ;; back to the bottom, or typing, resumes it.
+  (defun my/vterm-wheel-up (event)
+    "Freeze the terminal in copy mode, then scroll up."
+    (interactive "e")
+    (unless vterm-copy-mode (vterm-copy-mode 1))
+    (mwheel-scroll event))
+  (defun my/vterm-wheel-down (event)
+    "Scroll down; leave copy mode once the bottom of the terminal is visible."
+    (interactive "e")
+    (mwheel-scroll event)
+    (when (and vterm-copy-mode
+               (pos-visible-in-window-p (point-max) (posn-window (event-start event))))
+      (vterm-copy-mode -1)))
+  (defun my/vterm-copy-mode-type ()
+    "Leave copy mode and send the typed character to the terminal."
+    (interactive)
+    (vterm-copy-mode -1)
+    (vterm--self-insert))
+  (dolist (prefix '("" "double-" "triple-"))
+    (define-key vterm-mode-map (vector (intern (concat prefix "wheel-up"))) #'my/vterm-wheel-up)
+    (define-key vterm-mode-map (vector (intern (concat prefix "wheel-down"))) #'my/vterm-wheel-down))
+  (define-key vterm-copy-mode-map [remap self-insert-command] #'my/vterm-copy-mode-type))
 
 ;;;; Remote Revise watcher (revise-sync.el lives in ~/.emacs.d/lisp/)
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
@@ -308,6 +435,28 @@ With prefix argument NEW, always open another terminal."
 (tool-bar-mode -1)
 (menu-bar-mode -1)                    ; F10 still opens the menus when needed
 (global-display-line-numbers-mode 1)
+(advice-add 'display-line-numbers--turn-on :before-until ; not in terminals, where
+            (lambda () (derived-mode-p 'vterm-mode)))   ; they cost the screen columns
+;; Symbols the default font lacks otherwise fall back to fonts such as Noto Sans
+;; Symbols2, whose lines are half again as tall.  Every line with one (Claude
+;; Code's ⏺ and ⏵) grows, and full-screen programs no longer fit their window.
+;; Use JuliaMono for them when it is installed, scaled to fit the default lines.
+(defun my/symbol-fallback-font (family)
+  "Draw symbols missing from the default font with FAMILY, no taller than it."
+  (when-let* (((display-graphic-p))
+              (entity (find-font (font-spec :family family)))
+              (default (font-info (face-font 'default)))
+              (info (font-info (open-font entity (aref default 2)))))
+    ;; font-info: 2 is the pixel size, 8 the ascent and 9 the descent
+    (add-to-list 'face-font-rescale-alist
+                 (cons (regexp-quote family)
+                       (min 1.0 (/ (float (aref default 8)) (aref info 8))
+                            (/ (float (aref default 9)) (aref info 9)))))
+    (set-fontset-font t '(#x2000 . #x2BFF) family nil 'append)
+    ;; Math symbols would still prefer Noto Sans Math, which is taller too
+    (dolist (range '((#x20D0 . #x20FF) (#x27C0 . #x27FF) (#x2900 . #x2AFF)))
+      (set-fontset-font t range family nil 'prepend))))
+(my/symbol-fallback-font "JuliaMono")
 (column-number-mode 1)
 (setq custom-file (locate-user-emacs-file "custom.el"))
 (load custom-file 'noerror)           ; keep Customize output out of init.el

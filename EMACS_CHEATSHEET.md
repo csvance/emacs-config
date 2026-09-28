@@ -50,7 +50,9 @@ A full terminal emulator, good for SSH and TUI programs such as coding agents. K
 | `C-c C-c` | Send Ctrl+C to the program (a single `C-c` waits for a second key) |
 | `C-c C-g` | Send Ctrl+G to the program (`C-g` alone cancels in Emacs) |
 | `C-c C-l` | Clear the scrollback |
-| `F1 M` | Toggle mouse forwarding, so full-screen programs (multiplexers, agents) receive clicks and the wheel. Sessions can turn it on with `:mouse t`. Leave it off in a plain shell, where clicks would arrive as typed text |
+| Mouse | When a full-screen program asks for the mouse (Claude Code, herdr), clicks, drags and the wheel go to it: click to expand blocks or pick panes, drag to select text or resize panes. The mode line then shows `Mouse`. At a shell prompt the mouse works as in any Emacs buffer |
+| Mouse wheel | When the program does not take the mouse, scrolling up freezes the terminal (mode line shows `VTermCopy`) so redraws stop pulling the view down; scroll back to the bottom or start typing to resume live output |
+| `F1 M` | Turn mouse forwarding off in this terminal (or back on), for example to select a TUI's text with the Emacs mouse |
 
 ## Magit
 

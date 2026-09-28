@@ -92,11 +92,11 @@ Global options (defcustoms):
 
 ## 6. Paths and projects
 
-Agents report paths as the sandbox sees them. The checkout campfire was installed from is bound at `/campfire` (recorded on the host in `~/.local/share/campfire/workspace`); other granted paths keep their host paths.
+Agents report paths as the sandbox sees them. `campfire info` gives the mapping as inside/outside pairs (today one: the checkout campfire was installed from, bound at `/campfire`); every other granted path is the same on both sides.
 
-- Emacs reads the workspace file once per host and maps `/campfire` back to the host path; other paths are used as they are
-- An agent buffer's `default-directory` is the mapped path, so ibuffer-project and `C-x p b` group it with the project's files. This relies on the host's paths existing locally, which holds for the shared NFS home
-- Starting an agent maps the other way: the project root becomes the sandbox path passed to herdr as `--cwd`
+- Emacs reads each host's mapping once (retrying at most once a minute until it succeeds) and maps agents' directories to host paths
+- An agent buffer's `default-directory` is the mapped path, so ibuffer-project and `C-x p b` group it with the project's files. This relies on the host's paths existing locally, which holds for a shared NFS home; elsewhere agents are still listed and usable, just not grouped under a local project
+- Starting an agent maps the other way: the project root becomes the sandbox path passed to herdr as `--cwd`, which likewise assumes the project is at the same path on the host
 
 ## 7. Emacs side
 
@@ -168,5 +168,5 @@ Each phase is usable on its own.
 ## 11. Open questions
 
 - **Several viewers**: whether Emacs should resize politely when herdr is attached to the same agent at a different size
-- **Paths outside the NFS home**: agents whose working directory does not exist locally would need TRAMP paths for project grouping
+- **Hosts without a shared home**: project grouping and starting agents assume the host's paths exist locally. TRAMP directories (`/ssh:HOST:PATH`) would lift that, at the cost of remote project detection
 - **Stale detection**: whether a working agent with no status change for a long time should be flagged, and after how long

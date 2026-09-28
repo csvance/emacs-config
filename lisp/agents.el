@@ -112,34 +112,52 @@ answer nothing."
 
 ;;;; Paths
 
-(defvar agents--checkouts (make-hash-table :test 'equal)
-  "Host name -> the checkout campfire binds at /campfire in that host's sandbox.")
+;; Agents report paths as the sandbox sees them.  `campfire info' says how those map to paths
+;; on the host (the checkout is /campfire inside); every other path is the same on both sides.
 
-(defun agents--fetch-checkout (host)
-  "Learn which checkout HOST's sandbox shows at /campfire."
+(defvar agents--path-maps (make-hash-table :test 'equal)
+  "Host name -> list of (INSIDE . OUTSIDE) directory pairs, from `campfire info'.")
+(defvar agents--path-maps-tried (make-hash-table :test 'equal)
+  "Host name -> `float-time' of the last attempt to read its path mapping.")
+
+(defun agents--fetch-path-map (host)
+  "Read HOST's path mapping from `campfire info', unless known or just tried."
   (let ((name (plist-get host :name)))
-    (unless (gethash name agents--checkouts)
-      (puthash name 'pending agents--checkouts)
-      (agents--run host "cat \"$HOME/.local/share/campfire/workspace\""
+    (unless (or (gethash name agents--path-maps)
+                (< (- (float-time) (gethash name agents--path-maps-tried 0)) 60))
+      (puthash name (float-time) agents--path-maps-tried)
+      (agents--run host (agents--campfire-argv host '("info"))
                    (lambda (ok stdout _stderr)
-                     (puthash name (and ok (file-name-as-directory (string-trim stdout)))
-                              agents--checkouts)
-                     (agents--schedule-redraw))))))
+                     (when-let* ((info (and ok (ignore-errors
+                                                 (json-parse-string
+                                                  (string-trim stdout) :object-type 'plist
+                                                  :array-type 'list :null-object nil)))))
+                       (puthash name
+                                (mapcar (lambda (m)
+                                          (cons (directory-file-name (plist-get m :inside))
+                                                (directory-file-name (plist-get m :outside))))
+                                        (plist-get info :paths))
+                                agents--path-maps)
+                       (agents--schedule-redraw)))))))
+
+(defun agents--map-path (host path from to)
+  "Map PATH on HOST with the first pair whose FROM side (car or cdr) contains it."
+  (let ((path (directory-file-name path)))
+    (or (seq-some (lambda (pair)
+                    (let ((src (funcall from pair)))
+                      (cond ((equal path src) (funcall to pair))
+                            ((string-prefix-p (concat src "/") path)
+                             (concat (funcall to pair) (substring path (length src)))))))
+                  (gethash (plist-get host :name) agents--path-maps))
+        path)))
 
 (defun agents--local-path (host path)
   "Map PATH as HOST's sandbox reports it to the path outside the sandbox."
-  (let ((checkout (gethash (plist-get host :name) agents--checkouts)))
-    (if (and (stringp checkout) (string-match "\\`/campfire\\(/\\|\\'\\)" path))
-        (expand-file-name (substring path (match-end 0)) checkout)
-      path)))
+  (agents--map-path host path #'car #'cdr))
 
 (defun agents--sandbox-path (host path)
   "Map PATH outside HOST's sandbox to the path the sandbox sees."
-  (let ((checkout (gethash (plist-get host :name) agents--checkouts))
-        (path (directory-file-name (expand-file-name path))))
-    (if (and (stringp checkout) (file-in-directory-p path checkout))
-        (directory-file-name (concat "/campfire/" (file-relative-name path checkout)))
-      path)))
+  (agents--map-path host (expand-file-name path) #'cdr #'car))
 
 ;;;; Registry
 
@@ -191,7 +209,7 @@ answer nothing."
   "Refresh HOST's agents, unless a poll of it is already running."
   (let ((name (plist-get host :name)))
     (unless (gethash name agents--polling)
-      (agents--fetch-checkout host)
+      (agents--fetch-path-map host)
       (puthash name t agents--polling)
       (puthash name (float-time) agents--last-poll)
       (agents--herdr host '("agent" "list")

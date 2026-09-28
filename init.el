@@ -101,8 +101,23 @@ When COMMAND exits, the buffer closes.")
   :mode ("\\(?:Container\\|Docker\\)file\\(?:\\..*\\)?\\'" . dockerfile-mode))
 (use-package markdown-mode
   :mode ("README\\.md\\'" . gfm-mode)  ; GitHub flavor for READMEs; other .md files use markdown-mode
+  :bind (:map markdown-view-mode-map   ; shared by gfm-view-mode
+              ("e" . my/markdown-edit))
   :custom
-  (markdown-fontify-code-blocks-natively t)) ; highlight fenced code in its own language
+  (markdown-fontify-code-blocks-natively t) ; highlight fenced code in its own language
+  :config
+  (defun my/markdown-view ()
+    "Show the current Markdown buffer rendered: markup hidden, larger headings, read-only."
+    (gfm-view-mode)
+    ;; Scale headings in this buffer only; `markdown-header-scaling' would resize them everywhere
+    (dotimes (n 6)
+      (face-remap-add-relative (intern (format "markdown-header-face-%d" (1+ n)))
+                               :height (float (nth n markdown-header-scaling-values)))))
+  (defun my/markdown-edit ()
+    "Leave the rendered view and edit the file in its usual Markdown mode."
+    (interactive)
+    (read-only-mode -1)
+    (normal-mode)))                   ; reapplies the auto-mode-alist choice; drops the heading remaps
 
 ;; Tree-sitter modes give richer, more accurate highlighting.
 ;; treesit-auto offers to download each grammar the first time you open a file
@@ -143,14 +158,20 @@ When COMMAND exits, the buffer closes.")
   :ensure nil                         ; built in
   :init
   (defun my/project-open-readme ()
-    "Open the current project's README, or its root directory if it has none."
+    "Open the current project's README, or its root directory if it has none.
+A Markdown README not already open is shown rendered; press e to edit it."
     (interactive)
     (let* ((root (project-root (project-current t)))
            (readme (seq-find #'file-regular-p
                              (mapcar (lambda (f) (expand-file-name f root))
                                      '("README.md" "readme.md" "README.org"
                                        "README.rst" "README.txt" "README")))))
-      (if readme (find-file readme) (project-dired))))
+      (if (not readme)
+          (project-dired)
+        (let ((already-open (find-buffer-visiting readme)))
+          (find-file readme)
+          (when (and (not already-open) (derived-mode-p 'markdown-mode))
+            (my/markdown-view))))))
   :custom
   (project-switch-commands #'my/project-open-readme) ; no action menu
   :config

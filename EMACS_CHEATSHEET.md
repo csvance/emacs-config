@@ -7,7 +7,8 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 | Key | Action |
 |---|---|
 | `F1` | Personal menu: sessions and custom commands (see below). Help is on `C-h` |
-| `F8` | Toggle the Treemacs sidebar |
+| `F2` | Agents menu: visit, start and stop campfire agents (see below) |
+| `F8` | Toggle the sidebar: Treemacs, with the agents pane below it |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |
 | `F12` | Open the project's terminal, or return to the previous buffer |
@@ -22,7 +23,7 @@ A Magit-style menu of custom commands. Press `F1` (or `C-c m`), then the letter 
 | `b` / `B` | Switch buffer (with preview) / buffer list grouped by project |
 | `t` / `T` / `M` | Project terminal / new project terminal / toggle mouse forwarding (in a terminal) |
 | `p` / `f` / `g` | Switch project / find file in project / Magit status |
-| `s` / `i` / `c` | Toggle sidebar / toggle type hints (language server buffers) / cheat sheet |
+| `s` / `i` / `c` | Toggle sidebar (as `F8`) / toggle type hints (language server buffers) / cheat sheet |
 | `r` / `R` | revise-sync watcher status / restart |
 
 ## Finding buffers
@@ -38,7 +39,7 @@ Every prompt (`C-x b`, `M-x`, find file, switch project) shows a vertical list y
 
 ## Terminal (vterm)
 
-A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F8`, `F9` and `F12` prefixes and any session keys.
+A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F2`, `F8`, `F9` and `F12` prefixes and any session keys.
 
 | Key | Action |
 |---|---|
@@ -53,6 +54,21 @@ A full terminal emulator, good for SSH and TUI programs such as coding agents. K
 | Mouse | When a full-screen program asks for the mouse (Claude Code, herdr), clicks, drags and the wheel go to it: click to expand blocks or pick panes, drag to select text or resize panes. The mode line then shows `Mouse`. At a shell prompt the mouse works as in any Emacs buffer |
 | Mouse wheel | When the program does not take the mouse, scrolling up freezes the terminal (mode line shows `VTermCopy`) so redraws stop pulling the view down; scroll back to the bottom or start typing to resume live output |
 | `F1 M` | Turn mouse forwarding off in this terminal (or back on), for example to select a TUI's text with the Emacs mouse |
+
+## Agents (F2)
+
+Each Claude Code agent of a campfire session has its own buffer, `*agent: PROJECT (PANE)*`, listed under its project in `C-x C-b` and `C-x p b`. Hosts are set in `local.el` (`agents-hosts`). The agents pane below Treemacs shows every agent's status by project: `●` blocked (waiting for your answer), `✓` done, `◐` working, `○` idle. An agent buffer's mode line shows its status too.
+
+| Key | Action |
+|---|---|
+| `F2 1`...`9` | Visit that agent |
+| `F2 a` | Visit the next agent waiting for you, blocked ones first |
+| `F2 v` | Visit an agent, chosen by name |
+| `F2 n` | Start an agent in the current project (`C-u F2 n` asks for the project) |
+| `F2 k` | Stop an agent (the one in this buffer, else chosen by name) |
+| `F2 g` | Refresh now (status changes normally arrive within about a second) |
+| Agents pane | `RET` or a click visits the agent on that line; `k` stops it, `n` starts one, `a` next waiting, `g` refreshes |
+| `C-x k` | In an agent buffer, close the buffer only: the agent keeps running, and visiting it again reattaches |
 
 ## Magit
 

@@ -17,6 +17,7 @@
 ;;;; Machine-specific settings (local.el is not checked in)
 ;; Example local.el:
 ;;   (setq my/projects '("~/Git/some-repo" "~/Git/other-repo"))
+;;   (setq agents-hosts '((:name "repl" :ssh "user@repl-host")))  ; campfire sessions
 ;;   (setq revise-sync-default-host "user@repl-host")
 ;;   (setq revise-sync-projects '("~/Git/some-repo" ("~/Git/other-repo" . "other-host")))
 ;;   (setq my/vterm-sessions
@@ -175,13 +176,12 @@ When COMMAND exits, the buffer closes.")
 (use-package nerd-icons)
 
 (use-package treemacs
-  :bind ("<f8>" . treemacs)
-  :hook (emacs-startup . my/treemacs-at-startup)
+  :hook (emacs-startup . my/treemacs-at-startup)   ; F8 is `agents-sidebar-toggle', below
   :init
   (defun my/treemacs-at-startup ()
-    "Open the sidebar at startup but leave the cursor in the editor."
+    "Open the sidebar (Treemacs and the agents pane) at startup, cursor in the editor."
     (unless (daemonp)
-      (save-selected-window (treemacs))))
+      (agents-sidebar-toggle)))
   :config
   (treemacs-follow-mode 1)            ; highlight the current file
   (treemacs-project-follow-mode 1)    ; show only the current buffer's project
@@ -211,7 +211,7 @@ When COMMAND exits, the buffer closes.")
   (vterm-enable-manipulate-selection-data-by-osc52 t)
   ;; Keep these for Emacs instead of sending them to the terminal program
   (vterm-keymap-exceptions (append '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o" "C-y" "M-y"
-                                     "<f1>" "<f8>" "<f9>" "<f12>")
+                                     "<f1>" "<f2>" "<f8>" "<f9>" "<f12>")
                                    (delq nil (mapcar (lambda (s) (plist-get s :key))
                                                      my/vterm-sessions))))
   :init
@@ -430,6 +430,16 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
   :config
   (revise-sync-mode 1))
 
+;;;; Agents: each campfire agent in its own buffer (lisp/agents.el, design in agents-design.md)
+;; F2 opens the agents menu; F8 shows or hides the sidebar, Treemacs with the agents pane below it
+(use-package agents
+  :ensure nil                         ; hosts are set in local.el
+  :demand t                           ; poll from startup, so status is current before F2
+  :bind (("<f2>" . agents-menu)
+         ("<f8>" . agents-sidebar-toggle))
+  :config
+  (agents-start))
+
 ;;;; Quality of life
 (setq inhibit-startup-screen t)
 (tool-bar-mode -1)
@@ -485,7 +495,7 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
              (seq-filter (lambda (s) (plist-get s :menu)) my/vterm-sessions))))
   (transient-define-prefix my/menu ()
     "Personal command menu."
-    [["Sessions" :setup-children my/menu--sessions]
+    [["Sessions" :class transient-column :setup-children my/menu--sessions]
      ["Terminal"
       ("t" "Project terminal" my/project-vterm)
       ("T" "New project terminal" (lambda () (interactive) (my/project-vterm t)))
@@ -499,7 +509,7 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
       ("f" "Find file in project" project-find-file)
       ("g" "Magit status" magit-status)]
      ["View"
-      ("s" "Toggle sidebar" treemacs)
+      ("s" "Toggle sidebar" agents-sidebar-toggle)
       ("i" "Toggle type hints" eglot-inlay-hints-mode
        :if (lambda () (bound-and-true-p eglot--managed-mode)))
       ("c" "Cheat sheet" my/toggle-cheatsheet)]

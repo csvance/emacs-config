@@ -8,6 +8,7 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 |---|---|
 | `F1` | Personal menu: sessions and custom commands (see below). Help is on `C-h` |
 | `F2` | Agents menu: visit, start and stop campfire agents (see below) |
+| `F7` | Mode toggle: Markdown rendered view (read-only) or editing; inline type hints in language server buffers |
 | `F8` | Toggle the sidebar: Treemacs, with the agents pane below it |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |
@@ -241,7 +242,7 @@ Works for Julia (JETLS) and Python (basedpyright). Shell, Go and Rust use tree-s
 | Ctrl+click | Go to definition |
 | Mouse back / forward buttons | Go back / forward |
 | `C-M-.` | Search for a symbol by name |
-| `F1 i` | Toggle inline type hints (`M-x eglot-inlay-hints-mode`) |
+| `F7` or `F1 i` | Toggle inline type hints (`M-x eglot-inlay-hints-mode`) |
 | `M-x eglot-rename` | Rename symbol across the project |
 | `M-x eglot-code-actions` | Quick fixes and refactorings |
 | `M-x eglot-format` | Format the buffer or selection |

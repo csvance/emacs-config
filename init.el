@@ -492,6 +492,16 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
 (setq custom-file (locate-user-emacs-file "custom.el"))
 (load custom-file 'noerror)           ; keep Customize output out of init.el
 
+;;;; Mode toggle: F7 flips the current buffer's main display option
+(defun my/mode-toggle ()
+  "Toggle Markdown's rendered view, or inline type hints in a language server buffer."
+  (interactive)
+  (cond ((derived-mode-p 'markdown-view-mode 'gfm-view-mode) (my/markdown-edit))
+        ((derived-mode-p 'markdown-mode) (my/markdown-view)) ; after the view modes, which derive from it
+        ((bound-and-true-p eglot--managed-mode) (call-interactively #'eglot-inlay-hints-mode))
+        (t (user-error "F7 has no toggle in %s" major-mode))))
+(global-set-key (kbd "<f7>") #'my/mode-toggle)
+
 ;;;; Cheat sheet: F9 opens it, F9 again returns to the previous buffer
 (defun my/toggle-cheatsheet ()
   "Show the Emacs cheat sheet, or leave it if it is already showing."

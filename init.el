@@ -418,7 +418,7 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
   ;; When the program is not asking for the mouse, the wheel scrolls the
   ;; scrollback in Emacs, but the program's redraws keep jumping the view back
   ;; to the bottom.  Scrolling up freezes the terminal in copy mode; scrolling
-  ;; back to the bottom, or typing, resumes it.
+  ;; back to the bottom, typing or Escape resumes it.
   (defun my/vterm-wheel-up (event)
     "Freeze the terminal in copy mode, then scroll up."
     (interactive "e")
@@ -432,14 +432,17 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
                (pos-visible-in-window-p (point-max) (posn-window (event-start event))))
       (vterm-copy-mode -1)))
   (defun my/vterm-copy-mode-type ()
-    "Leave copy mode and send the typed character to the terminal."
+    "Leave copy mode and send the typed key to the terminal."
     (interactive)
     (vterm-copy-mode -1)
     (vterm--self-insert))
   (dolist (prefix '("" "double-" "triple-"))
     (define-key vterm-mode-map (vector (intern (concat prefix "wheel-up"))) #'my/vterm-wheel-up)
     (define-key vterm-mode-map (vector (intern (concat prefix "wheel-down"))) #'my/vterm-wheel-down))
-  (define-key vterm-copy-mode-map [remap self-insert-command] #'my/vterm-copy-mode-type))
+  (define-key vterm-copy-mode-map [remap self-insert-command] #'my/vterm-copy-mode-type)
+  ;; Copy mode drops vterm's keymap, so Escape would become Emacs's Meta prefix
+  ;; and never reach the program (such as Claude Code's Esc to go back)
+  (define-key vterm-copy-mode-map [escape] #'my/vterm-copy-mode-type))
 
 ;;;; Remote Revise watcher (revise-sync.el lives in ~/.emacs.d/lisp/)
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))

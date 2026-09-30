@@ -6,6 +6,7 @@ custom.el
 projects
 recentf
 auto-save-list/
+backups/
 .cache/
 transient/
 eshell/

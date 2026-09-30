@@ -47,6 +47,14 @@ When COMMAND exits, the buffer closes.")
               (lambda ()
                 (unless (frame-focus-state)
                   (save-some-buffers t))))    ; t = save all without asking
+
+;; No clutter next to your files.  Saving the file itself every few seconds
+;; (above) makes the #file# auto-save copies redundant, the .#file lock files
+;; only guard against a second Emacs editing the same file, and file~ backups
+;; (the version before this session's first save) go in one directory.
+(setq auto-save-default nil
+      create-lockfiles nil
+      backup-directory-alist `(("." . ,(locate-user-emacs-file "backups"))))
 ;; IDE-style mouse: right-click menu, Ctrl+click to go to definition,
 ;; mouse side buttons to go back and forward
 (context-menu-mode 1)

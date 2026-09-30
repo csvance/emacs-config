@@ -184,6 +184,50 @@ answer nothing."
   "All known agents."
   (hash-table-values agents--registry))
 
+;;;; Seen: whether you have looked at an agent since it finished
+;; herdr reports `done' for a finished agent until someone looks at its pane,
+;; then `idle', but only its own UI counts as looking.  So Emacs keeps its own
+;; record: selecting a finished agent's window marks it seen, and it shows as
+;; idle until its status changes again.  Polls supply the agent's
+;; `state_change_seq', which tells a later finish from the one you saw;
+;; status-change events do not, so an event clears the mark instead.
+
+(defvar agents--seen (make-hash-table :test 'equal)
+  "Key -> the agent's seq when you looked at it finished (nil if not known yet).")
+
+(defun agents--seen-p (agent)
+  "Non-nil if you have looked at AGENT since it last finished."
+  (let ((seen (gethash (agents-agent-key agent) agents--seen 'never)))
+    (and (not (eq seen 'never))
+         (or (null seen) (null (agents-agent-seq agent)) (equal seen (agents-agent-seq agent))))))
+
+(defun agents--status (agent)
+  "AGENT's status as shown: a `done' you have already looked at shows as `idle'."
+  (let ((status (agents-agent-status agent)))
+    (if (and (eq status 'done) (agents--seen-p agent)) 'idle status)))
+
+(defun agents--note-looking (&rest _)
+  "Mark the agent in the selected window seen, if it has finished."
+  (when-let* ((key (buffer-local-value 'agents--key (window-buffer (selected-window))))
+              (agent (gethash key agents--registry))
+              ((eq (agents-agent-status agent) 'done))
+              ((not (agents--seen-p agent))))
+    (puthash key (agents-agent-seq agent) agents--seen)
+    (agents--schedule-redraw)))
+
+(defun agents--reconcile-seen (agent)
+  "Update AGENT's seen mark from a poll: fill in its seq, or drop it after a change."
+  (let* ((key (agents-agent-key agent))
+         (seen (gethash key agents--seen 'never)))
+    (cond ((eq seen 'never))
+          ((not (eq (agents-agent-status agent) 'done)) (remhash key agents--seen))
+          ((null seen) (puthash key (agents-agent-seq agent) agents--seen))
+          ((not (equal seen (agents-agent-seq agent))) (remhash key agents--seen)))))
+
+;; Looking means selecting the agent's window, or showing it in the selected one
+(add-hook 'window-selection-change-functions #'agents--note-looking)
+(add-hook 'window-buffer-change-functions #'agents--note-looking)
+
 (defun agents--update-host (host agents)
   "Replace HOST's entries in the registry with AGENTS, a parsed `agent list'."
   (let ((name (plist-get host :name)))
@@ -193,17 +237,18 @@ answer nothing."
     (dolist (a agents)
       (let ((pane (plist-get a :pane_id)))
         (when (agents--id-p pane)
-          (let ((key (concat name " " pane)))
-            (puthash key
-                     (agents--make-agent
-                      :host name :key key :pane pane
-                      :workspace (plist-get a :workspace_id)
-                      :dir (agents--local-path host (or (plist-get a :cwd) "~"))
-                      :status (intern (or (plist-get a :agent_status) "unknown"))
-                      :seq (plist-get a :state_change_seq)
-                      :title (plist-get a :terminal_title_stripped)
-                      :session (plist-get (plist-get a :agent_session) :value))
-                     agents--registry)))))))
+          (let* ((key (concat name " " pane))
+                 (agent (agents--make-agent
+                         :host name :key key :pane pane
+                         :workspace (plist-get a :workspace_id)
+                         :dir (agents--local-path host (or (plist-get a :cwd) "~"))
+                         :status (intern (or (plist-get a :agent_status) "unknown"))
+                         :seq (plist-get a :state_change_seq)
+                         :title (plist-get a :terminal_title_stripped)
+                         :session (plist-get (plist-get a :agent_session) :value))))
+            (puthash key agent agents--registry)
+            (agents--reconcile-seen agent)))))
+    (agents--note-looking)))
 
 (defun agents--poll (host)
   "Refresh HOST's agents, unless a poll of it is already running."
@@ -260,7 +305,12 @@ answer nothing."
          (if (not agent)
              (agents--poll-soon host)
            (setf (agents-agent-status agent)
-                 (intern (or (plist-get data :agent_status) "unknown")))
+                 (intern (or (plist-get data :agent_status) "unknown"))
+                 ;; A new status: the old seq no longer describes it, and any
+                 ;; finish you saw is over (unless you are looking right now)
+                 (agents-agent-seq agent) nil)
+           (remhash (agents-agent-key agent) agents--seen)
+           (agents--note-looking)
            (when-let* ((title (plist-get data :title)))
              (setf (agents-agent-title agent) title))
            (agents--schedule-redraw))))
@@ -351,8 +401,8 @@ answer nothing."
 
 (defun agents--label (agent)
   "One-line description of AGENT: glyph, status and title."
-  (pcase-let ((`(,glyph ,face) (agents--glyph (agents-agent-status agent))))
-    (concat (propertize (format "%s %-8s" glyph (agents-agent-status agent)) 'face face)
+  (pcase-let ((`(,glyph ,face) (agents--glyph (agents--status agent))))
+    (concat (propertize (format "%s %-8s" glyph (agents--status agent)) 'face face)
             (or (agents-agent-title agent) (agents-agent-pane agent))
             (if (cdr agents-hosts)
                 (propertize (concat "  " (agents-agent-host agent)) 'face 'shadow)
@@ -360,7 +410,7 @@ answer nothing."
 
 (defun agents--attention-p (agent)
   "Non-nil when AGENT is waiting for you."
-  (memq (agents-agent-status agent) '(blocked done)))
+  (memq (agents--status agent) '(blocked done)))
 
 (defun agents--sorted ()
   "Agents grouped by project, most recently used first; blocked first in each."
@@ -393,8 +443,8 @@ answer nothing."
 (defun agents--mode-line ()
   "Mode line status of the current agent buffer."
   (when-let* ((agent (gethash agents--key agents--registry)))
-    (pcase-let ((`(,glyph ,face) (agents--glyph (agents-agent-status agent))))
-      (propertize (format " %s %s" glyph (agents-agent-status agent)) 'face face))))
+    (pcase-let ((`(,glyph ,face) (agents--glyph (agents--status agent))))
+      (propertize (format " %s %s" glyph (agents--status agent)) 'face face))))
 
 (defun agents-visit (agent)
   "Switch to AGENT's buffer, attaching to the agent if it has none."

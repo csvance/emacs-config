@@ -164,8 +164,18 @@ When COMMAND exits, the buffer closes.")
 ;;;; Projects: switch with C-x p p; the Treemacs sidebar follows the current one
 (use-package project
   :ensure nil                         ; built in
+  :init
+  (defun my/project-show-in-sidebar ()
+    "Show the current project in the Treemacs sidebar and move there, opening no buffer."
+    (interactive)
+    (require 'treemacs)
+    (let ((default-directory (project-root (project-current t))))
+      (unless (eq (treemacs-current-visibility) 'visible)
+        (agents-sidebar-toggle))
+      (treemacs-add-and-display-current-project-exclusively)
+      (treemacs-select-window)))
   :custom
-  (project-switch-commands #'project-dired) ; open the project root, no action menu
+  (project-switch-commands #'my/project-show-in-sidebar) ; no action menu, no new buffer
   :config
   ;; Never treat the home directory itself as a project, even if a stray ~/.git appears
   (advice-add 'project-try-vc :filter-return

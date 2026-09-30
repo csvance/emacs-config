@@ -231,7 +231,7 @@ Works in any file buffer, no sidebar needed. Uses Git to list files, so it stays
 
 | Key | Action |
 |---|---|
-| `C-x p p` | Switch to another project |
+| `C-x p p` | Switch to another project: it shows in the sidebar, no buffer opens |
 | `C-x p f` | Find a file in the current project |
 | `C-x p g` | Search the project with a regular expression |
 | `C-x p b` | Switch between buffers of this project |

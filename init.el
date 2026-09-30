@@ -240,7 +240,7 @@ A Markdown README not already open is shown rendered; press e to edit it."
   (vterm-enable-manipulate-selection-data-by-osc52 t)
   ;; Keep these for Emacs instead of sending them to the terminal program
   (vterm-keymap-exceptions (append '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o" "C-y" "M-y"
-                                     "<f1>" "<f2>" "<f8>" "<f9>" "<f12>")
+                                     "<f1>" "<f2>" "<f3>" "<f8>" "<f9>" "<f12>")
                                    (delq nil (mapcar (lambda (s) (plist-get s :key))
                                                      my/vterm-sessions))))
   :init
@@ -471,6 +471,12 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
          ("<f8>" . agents-sidebar-toggle))
   :config
   (agents-start))
+
+;;;; Layouts: F3 arranges the editing area, optionally over a tile for agents (lisp/layouts.el)
+(use-package layouts
+  :ensure nil
+  :demand t                           ; its display rule must be in place before any agent opens
+  :bind ("<f3>" . layouts-menu))
 
 ;;;; Quality of life
 (setq inhibit-startup-screen t)

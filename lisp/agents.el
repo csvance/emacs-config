@@ -400,7 +400,7 @@ answer nothing."
   "Switch to AGENT's buffer, attaching to the agent if it has none."
   (let ((buf (gethash (agents-agent-key agent) agents--buffers)))
     (if (buffer-live-p buf)
-        (switch-to-buffer buf)
+        (pop-to-buffer-same-window buf)   ; follows `display-buffer-alist', as vterm does for a new one
       (require 'vterm)
       (let* ((host (agents--host (agents-agent-host agent)))
              (key (agents-agent-key agent))

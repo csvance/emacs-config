@@ -8,11 +8,22 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 |---|---|
 | `F1` | Personal menu: sessions and custom commands (see below). Help is on `C-h` |
 | `F2` | Agents menu: visit, start and stop campfire agents (see below) |
+| `F3` | Layouts: one window, one over an agent, or an editor and Magit over an agent (see below) |
 | `F7` | Mode toggle: Markdown rendered view (read-only) or editing; inline type hints in language server buffers |
 | `F8` | Toggle the sidebar: Treemacs, with the agents pane below it |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |
 | `F12` | Open the project's terminal, or return to the previous buffer |
+
+## Layouts (F3)
+
+Arranges the editing area beside the sidebar. In the two tiled layouts, Claude Code agents always open in a tile along the bottom, however you visit them (`F2`, the agents pane, `C-x b`); `C-x 1`, `C-x 2` and `C-x 3` in the editing area leave the tile alone.
+
+| Key | Layout |
+|---|---|
+| `1` | One window (the buffer you were in, agent or not) |
+| `2` | One window over an agent |
+| `3` | An editor and Magit side by side over an agent; Magit follows the editor's project |
 
 ## Personal menu (F1)
 
@@ -40,7 +51,7 @@ Every prompt (`C-x b`, `M-x`, find file, switch project) shows a vertical list y
 
 ## Terminal (vterm)
 
-A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F2`, `F8`, `F9` and `F12` prefixes and any session keys.
+A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F2`, `F3`, `F8`, `F9` and `F12` prefixes and any session keys.
 
 | Key | Action |
 |---|---|

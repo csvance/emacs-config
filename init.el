@@ -164,24 +164,8 @@ When COMMAND exits, the buffer closes.")
 ;;;; Projects: switch with C-x p p; the Treemacs sidebar follows the current one
 (use-package project
   :ensure nil                         ; built in
-  :init
-  (defun my/project-open-readme ()
-    "Open the current project's README, or its root directory if it has none.
-A Markdown README not already open is shown rendered; press e to edit it."
-    (interactive)
-    (let* ((root (project-root (project-current t)))
-           (readme (seq-find #'file-regular-p
-                             (mapcar (lambda (f) (expand-file-name f root))
-                                     '("README.md" "readme.md" "README.org"
-                                       "README.rst" "README.txt" "README")))))
-      (if (not readme)
-          (project-dired)
-        (let ((already-open (find-buffer-visiting readme)))
-          (find-file readme)
-          (when (and (not already-open) (derived-mode-p 'markdown-mode))
-            (my/markdown-view))))))
   :custom
-  (project-switch-commands #'my/project-open-readme) ; no action menu
+  (project-switch-commands #'project-dired) ; open the project root, no action menu
   :config
   ;; Never treat the home directory itself as a project, even if a stray ~/.git appears
   (advice-add 'project-try-vc :filter-return

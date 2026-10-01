@@ -5,7 +5,8 @@
 ;; Notes are Denote files: Markdown with YAML front matter, named
 ;; ID--title__tag1_tag2.md, so any tool can find them.  A new note starts
 ;; untitled; type and save.  On save, an untitled, untagged note goes to the
-;; local model (vLLM on aidevnfs1, key in secrets/authinfo) in the background,
+;; local model (an OpenAI-compatible server such as vLLM, set in local.el, its
+;; key in secrets/authinfo) in the background,
 ;; and its reply renames the file and fills in the front matter.  A title or
 ;; tags you set yourself are never replaced.  F4 opens the menu.
 
@@ -30,18 +31,26 @@
       denote-prompts nil               ; a new note asks nothing
       denote-known-keywords nil)       ; tags come only from your notes
 
-(defconst notes--host "aidevnfs1.medicalmetrics.local:18405"
-  "The model server, also the machine name of its key in secrets/authinfo.")
+(defcustom notes-model-host nil
+  "HOST:PORT of the OpenAI-compatible server that titles notes, over HTTPS.
+It is also the machine name of the server's key in secrets/authinfo.  Set in
+local.el; while it is nil, notes are not titled."
+  :type '(choice (const nil) string))
 
-(defvar notes-backend
-  (gptel-make-openai "vLLM"
-    :host notes--host
-    :key (lambda () (gptel-api-key-from-auth-source notes--host))
-    :protocol "https"
-    :endpoint "/v1/chat/completions"
-    :stream nil
-    :models (list (intern "Qwen3.8-27B-FP8 (No Thinking)")))
-  "The local model that titles and tags notes.")
+(defcustom notes-model nil
+  "Name of the model on `notes-model-host' that titles notes.  Set in local.el."
+  :type '(choice (const nil) string))
+
+(defun notes--backend ()
+  "The gptel backend for `notes-model-host' and `notes-model'."
+  (let ((host notes-model-host))
+    (gptel-make-openai "notes"
+      :host host
+      :key (lambda () (gptel-api-key-from-auth-source host))
+      :protocol "https"
+      :endpoint "/v1/chat/completions"
+      :stream nil
+      :models (list (intern notes-model)))))
 
 (defconst notes--schema
   '(:type "object"
@@ -56,7 +65,7 @@
   (format "You title and tag personal technical notes. Reply with a title of at most
 eight words that says what the note is about, and one to three short lowercase tags
 (single words, no spaces). Reuse existing tags when they fit. Existing tags: %s"
-          (or (string-join (denote-keywords) ", ") "none yet")))
+          (if-let* ((tags (denote-keywords))) (string-join tags ", ") "none yet")))
 
 (defun notes--body ()
   "The note's text, without its front matter."
@@ -94,15 +103,16 @@ On save this runs only for an untitled, untagged note; with FORCE
   (interactive (list t))
   (let ((file buffer-file-name)
         (buffer (current-buffer)))
-    (when (and file (denote-file-is-in-denote-directory-p file)
+    (when (and notes-model-host notes-model
+               file (denote-file-is-in-denote-directory-p file)
                (denote-file-has-denoted-filename-p file)
                (or force (notes--untitled-p file))
                (not notes--pending)
                (>= (length (notes--body)) notes-min-length))
       (setq notes--pending t)
-      (let ((gptel-backend notes-backend)
-            (gptel-model (car (gptel-backend-models notes-backend)))
-            (gptel-use-tools nil))
+      (let* ((gptel-backend (notes--backend))
+             (gptel-model (car (gptel-backend-models gptel-backend)))
+             (gptel-use-tools nil))
         (gptel-request (notes--body)
           :system (notes--prompt)
           :schema notes--schema

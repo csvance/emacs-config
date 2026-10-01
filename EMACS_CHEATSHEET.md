@@ -80,6 +80,7 @@ A full terminal emulator, good for SSH and TUI programs such as coding agents. K
 | Mouse | When a full-screen program asks for the mouse (Claude Code, herdr), clicks, drags and the wheel go to it: click to expand blocks or pick panes, drag to select text or resize panes. The mode line then shows `Mouse`. At a shell prompt the mouse works as in any Emacs buffer |
 | Mouse wheel | When the program does not take the mouse, scrolling up freezes the terminal (mode line shows `VTermCopy`) so redraws stop pulling the view down; scroll back to the bottom or start typing to resume live output |
 | `F1 M` | Turn mouse forwarding off in this terminal (or back on), for example to select a TUI's text with the Emacs mouse |
+| `Ctrl`+click | Open the URL under the pointer in the browser, even one a program wrapped onto several lines; works whether or not the program has the mouse |
 
 ## Agents (F2)
 

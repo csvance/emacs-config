@@ -10,6 +10,10 @@
 ;;
 ;; `tui-mouse-mode' is on in every vterm buffer; turn it off (F1 M) to select a
 ;; TUI's text with the Emacs mouse instead.
+;;
+;; Ctrl+click on a URL opens it in the browser, in every terminal and whether
+;; or not the program has the mouse.  A program such as Claude Code wraps a long
+;; URL onto several lines itself, so the pieces are joined back together.
 
 ;;; Code:
 
@@ -25,6 +29,9 @@
 
 (defvar-local tui-mouse--rows nil
   "Height of the terminal screen in rows.")
+
+(defvar-local tui-mouse--cols nil
+  "Width of the terminal screen in columns.")
 
 (defun tui-mouse--track-modes (process output)
   "Record the mouse reporting modes that OUTPUT from PROCESS turns on or off."
@@ -48,11 +55,12 @@
 (advice-add 'vterm--filter :before #'tui-mouse--track-modes)
 
 (defun tui-mouse--record-size (resize process windows)
-  "Call RESIZE with PROCESS and WINDOWS, remembering the screen height it sets."
+  "Call RESIZE with PROCESS and WINDOWS, remembering the screen size it sets."
   (let ((size (funcall resize process windows)))
     (when (and size (processp process) (buffer-live-p (process-buffer process)))
       (with-current-buffer (process-buffer process)
-        (setq tui-mouse--rows (cdr size))))
+        (setq tui-mouse--cols (car size)
+              tui-mouse--rows (cdr size))))
     size))
 
 (advice-add 'vterm--window-adjust-process-window-size :around #'tui-mouse--record-size)
@@ -161,8 +169,88 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
 
 (add-hook 'vterm-mode-hook
           (lambda ()
-            (setq tui-mouse--rows (window-body-height)) ; the size vterm starts with
+            (setq tui-mouse--rows (window-body-height) ; the size vterm starts with
+                  tui-mouse--cols (window-body-width))
             (tui-mouse-mode 1)))
+
+;;;; Ctrl+click opens a URL
+
+(defconst tui-mouse--url-chars "-A-Za-z0-9._~:/?#@!$&'()*+,;=%[]"
+  "Characters a URL can contain, for `skip-chars-forward'.")
+
+(defun tui-mouse--url-char-p (char)
+  "Non-nil if CHAR can be part of a URL."
+  (and char (string-match-p "[][A-Za-z0-9._~:/?#@!$&'()*+,;=%-]" (string char))))
+
+(defun tui-mouse--wraps-p ()
+  "Non-nil if this line's text ends in a URL character at the screen's right edge.
+A program wrapping a long word breaks it there, give or take a border or
+padding of a few columns."
+  (save-excursion
+    (end-of-line)
+    (skip-chars-backward " \t")
+    (and (tui-mouse--url-char-p (char-before))
+         (>= (current-column) (- (or tui-mouse--cols (window-body-width)) 4)))))
+
+(defun tui-mouse--starts-line-p ()
+  "Non-nil if only spaces come before point on its line."
+  (save-excursion (skip-chars-backward " \t" (line-beginning-position)) (bolp)))
+
+(defun tui-mouse--url-at (pos)
+  "The URL at POS, joined across the lines a program wrapped it onto, or nil."
+  (save-excursion
+    (goto-char pos)
+    (skip-chars-backward tui-mouse--url-chars (line-beginning-position))
+    ;; Back to the first piece: while this piece starts its line and the line
+    ;; before ends at the right edge
+    (while (and (tui-mouse--starts-line-p)
+                (save-excursion (and (zerop (forward-line -1)) (tui-mouse--wraps-p))))
+      (forward-line -1)
+      (end-of-line)
+      (skip-chars-backward " \t")
+      (skip-chars-backward tui-mouse--url-chars (line-beginning-position)))
+    ;; Forward, collecting pieces while each one ends its line at the right edge
+    (let ((start (point))
+          (pieces nil))
+      (skip-chars-forward tui-mouse--url-chars (line-end-position))
+      (while (and (save-excursion (skip-chars-forward " \t" (line-end-position)) (eolp))
+                  (tui-mouse--wraps-p)
+                  (save-excursion
+                    (and (zerop (forward-line 1))
+                         (progn (skip-chars-forward " \t" (line-end-position))
+                                (tui-mouse--url-char-p (char-after))))))
+        (push (buffer-substring-no-properties start (point)) pieces)
+        (forward-line 1)
+        (skip-chars-forward " \t" (line-end-position))
+        (setq start (point))
+        (skip-chars-forward tui-mouse--url-chars (line-end-position)))
+      (push (buffer-substring-no-properties start (point)) pieces)
+      (let ((text (apply #'concat (nreverse pieces))))
+        (when (string-match "\\(?:https?\\|file\\)://." text)
+          (let ((url (substring text (match-beginning 0))))
+            ;; Trailing punctuation belongs to the sentence, and so does a
+            ;; closing parenthesis the URL has no opening one for
+            (while (or (string-match-p "[.,;:!?']\\'" url)
+                       (and (string-suffix-p ")" url)
+                            (> (cl-count ?\) url) (cl-count ?\( url))))
+              (setq url (substring url 0 -1)))
+            url))))))
+
+(defun tui-mouse-open-link (event)
+  "Open the URL clicked with EVENT in the browser."
+  (interactive "e")
+  (let ((posn (event-start event)))
+    (with-current-buffer (window-buffer (posn-window posn))
+      (if-let* ((pos (posn-point posn))
+                (url (tui-mouse--url-at pos)))
+          (progn (message "Opening %s" url)
+                 (browse-url url))
+        (message "No URL here")))))
+
+(dolist (map (list vterm-mode-map vterm-copy-mode-map))
+  ;; Ctrl+press would open the buffer menu; the click that follows opens the link
+  (define-key map [C-down-mouse-1] #'ignore)
+  (define-key map [C-mouse-1] #'tui-mouse-open-link))
 
 (provide 'tui-mouse)
 ;;; tui-mouse.el ends here

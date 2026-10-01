@@ -165,10 +165,24 @@ When COMMAND exits, the buffer closes.")
 (use-package project
   :ensure nil                         ; built in
   :init
+  (defvar my/treemacs-pinned nil
+    "Non-nil while the sidebar keeps a project chosen with C-x p p.
+Treemacs otherwise follows the selected buffer's project, which is still the
+old one until you open something in the new one.")
+  (defun my/treemacs-unpin (frame)
+    "Let the sidebar follow again once a window of the editing area shows another buffer."
+    (when (and my/treemacs-pinned
+               (seq-some (lambda (w) (not (or (window-parameter w 'window-side)
+                                              (eq (window-old-buffer w) (window-buffer w)))))
+                         (window-list frame 'nomini)))
+      (setq my/treemacs-pinned nil)))
+  (add-hook 'window-buffer-change-functions #'my/treemacs-unpin)
+  (advice-add 'treemacs--do-follow-project :before-until (lambda () my/treemacs-pinned))
   (defun my/project-show-in-sidebar ()
     "Show the current project in the Treemacs sidebar and move there, opening no buffer."
     (interactive)
     (require 'treemacs)
+    (setq my/treemacs-pinned t)
     (let ((default-directory (project-root (project-current t))))
       (unless (eq (treemacs-current-visibility) 'visible)
         (agents-sidebar-toggle))

@@ -193,7 +193,7 @@ old one until you open something in the new one.")
       (unless (eq (treemacs-current-visibility) 'visible)
         (agents-sidebar-toggle))
       (treemacs-add-and-display-current-project-exclusively)
-      (treemacs-select-window)))
+      (select-window (treemacs-get-local-window)))) ; treemacs-select-window would toggle back out
   :custom
   (project-switch-commands #'my/project-show-in-sidebar) ; no action menu, no new buffer
   :config

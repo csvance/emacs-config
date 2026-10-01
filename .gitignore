@@ -2,6 +2,9 @@
 local.el
 custom.el
 
+# Credentials (API keys), in auth-source format; see init.el
+secrets/
+
 # State Emacs writes at runtime
 projects
 recentf

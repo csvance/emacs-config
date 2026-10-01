@@ -9,6 +9,7 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 | `F1` | Personal menu: sessions and custom commands (see below). Help is on `C-h` |
 | `F2` | Agents menu: visit, start and stop campfire agents (see below) |
 | `F3` | Layouts: one window, one over an agent, or an editor and Magit over an agent (see below) |
+| `F4` | Notes: start, find or search notes in `~/Git/notes` (see below) |
 | `F7` | Mode toggle: Markdown rendered view (read-only) or editing; inline type hints in language server buffers |
 | `F8` | Toggle the sidebar: Treemacs, with the agents pane below it |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
@@ -24,6 +25,19 @@ Arranges the editing area beside the sidebar. In the two tiled layouts, Claude C
 | `1` | One window (the buffer you were in, agent or not) |
 | `2` | One window over an agent |
 | `3` | An editor and Magit side by side over an agent; Magit follows the editor's project |
+
+## Notes (F4)
+
+Notes are Markdown files in `~/Git/notes`, named like `20261001T142315--fix-bazel-cache__bazel_disk.md` with the same title and tags in their YAML front matter. A new note starts untitled: just type and save. On save, the local model (vLLM on aidevnfs1) titles and tags it in the background, reusing tags you already have, and the file is renamed; Emacs never waits for it. A title or tags you set yourself are kept.
+
+| Key | Action |
+|---|---|
+| `n` | New note |
+| `f` | Find a note by title and tags; type `__bazel` to narrow to a tag |
+| `s` | Search the text of all notes |
+| `t` | Title and tag the current note now, replacing what it has |
+| `r` | Rename the current note yourself |
+| `d` | Open `~/Git/notes` in Dired |
 
 ## Personal menu (F1)
 
@@ -51,7 +65,7 @@ Every prompt (`C-x b`, `M-x`, find file, switch project) shows a vertical list y
 
 ## Terminal (vterm)
 
-A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F2`, `F3`, `F8`, `F9` and `F12` prefixes and any session keys.
+A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F2`, `F3`, `F4`, `F8`, `F9` and `F12` prefixes and any session keys.
 
 | Key | Action |
 |---|---|

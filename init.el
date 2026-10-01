@@ -35,6 +35,12 @@ session switches to its buffer if open, else starts COMMAND in a new terminal.
 When COMMAND exits, the buffer closes.")
 (load (locate-user-emacs-file "local.el") 'noerror)
 
+;; API keys live in secrets/authinfo (ignored by Git, mode 600), not ~/.authinfo:
+;; ~/.emacs.d persists in the sandbox, and a directory survives where a single
+;; bind-mounted file loses its Kerberos-backed NFS access.  One line per key:
+;;   machine HOST:PORT login apikey password KEY
+(setq auth-sources (list (locate-user-emacs-file "secrets/authinfo")))
+
 ;;;; Familiar editing behavior
 (cua-mode 1)                          ; C-c / C-x / C-v / C-z when text is selected
 (delete-selection-mode 1)             ; typing replaces the selection
@@ -248,7 +254,7 @@ old one until you open something in the new one.")
   (vterm-enable-manipulate-selection-data-by-osc52 t)
   ;; Keep these for Emacs instead of sending them to the terminal program
   (vterm-keymap-exceptions (append '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o" "C-y" "M-y"
-                                     "<f1>" "<f2>" "<f3>" "<f8>" "<f9>" "<f12>")
+                                     "<f1>" "<f2>" "<f3>" "<f4>" "<f8>" "<f9>" "<f12>")
                                    (delq nil (mapcar (lambda (s) (plist-get s :key))
                                                      my/vterm-sessions))))
   :init
@@ -485,6 +491,14 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
   :ensure nil
   :demand t                           ; its display rule must be in place before any agent opens
   :bind ("<f3>" . layouts-menu))
+
+;;;; Notes: F4.  Denote files in ~/Git/notes, titled and tagged on save by the local model
+(use-package denote :defer t)
+(use-package gptel :defer t)
+(use-package notes
+  :ensure nil
+  :demand t                           ; its save hook titles notes opened any way
+  :bind ("<f4>" . notes-menu))
 
 ;;;; Quality of life
 (setq inhibit-startup-screen t)

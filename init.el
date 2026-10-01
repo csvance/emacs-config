@@ -298,145 +298,13 @@ With prefix argument NEW, always open another terminal."
             (switch-to-buffer name)
           (vterm (if new (generate-new-buffer-name name) name))))))
   :config
-  ;; vterm never passes the mouse to programs, so full-screen TUIs (agents,
-  ;; multiplexers) cannot see clicks.  Watch the program's output for the
-  ;; sequences that turn mouse reporting on and off, and while it is on, report
-  ;; clicks, drags and the wheel as SGR sequences, as a real terminal would.
-  ;; Elsewhere, such as at a shell prompt, the mouse keeps its Emacs behavior.
-  (defvar-local my/vterm--mouse-modes nil
-    "Mouse reporting modes the program has turned on (1000, 1002, 1003, 1006).")
-  (defvar-local my/vterm--output-tail ""
-    "End of the previous output, in case a mode sequence was split across two.")
-  (defvar-local my/vterm--rows nil
-    "Height of the terminal screen in rows.")
-  (defun my/vterm--track-mouse-modes (process output)
-    "Record the mouse reporting modes that OUTPUT from PROCESS turns on or off."
-    (when-let* ((buf (process-buffer process))
-                ((buffer-live-p buf)))
-      (with-current-buffer buf
-        (let ((text (concat my/vterm--output-tail output))
-              (start 0))
-          ;; DECSET/DECRST (ESC [ ? N h, ESC [ ? N l) or a full reset (ESC c)
-          (while (string-match "\e\\(?:\\[\\?\\([0-9;]+\\)\\([hl]\\)\\|c\\)" text start)
-            (if (not (match-beginning 1))
-                (setq my/vterm--mouse-modes nil)
-              (dolist (mode (mapcar #'string-to-number (split-string (match-string 1 text) ";")))
-                (when (memq mode '(1000 1002 1003 1006))
-                  (setq my/vterm--mouse-modes (delq mode my/vterm--mouse-modes))
-                  (when (equal (match-string 2 text) "h")
-                    (push mode my/vterm--mouse-modes)))))
-            (setq start (match-end 0)))
-          (setq my/vterm--output-tail (substring output (max 0 (- (length output) 16))))))))
-  (advice-add 'vterm--filter :before #'my/vterm--track-mouse-modes)
-  (defun my/vterm--record-size (resize process windows)
-    "Call RESIZE with PROCESS and WINDOWS, remembering the screen height it sets."
-    (let ((size (funcall resize process windows)))
-      (when (and size (processp process) (buffer-live-p (process-buffer process)))
-        (with-current-buffer (process-buffer process)
-          (setq my/vterm--rows (cdr size))))
-      size))
-  (advice-add 'vterm--window-adjust-process-window-size :around #'my/vterm--record-size)
-  (defun my/vterm--screen-start ()
-    "Position of the terminal screen's top row in the current vterm buffer.
-The screen is the last `my/vterm--rows' lines, followed by one empty line;
-everything above it is scrollback."
-    (save-excursion
-      (goto-char (point-max))
-      (forward-line (- (or my/vterm--rows (window-body-height))))
-      (point)))
-  (defun my/vterm-mouse--active-p ()
-    "Non-nil when the program in this terminal wants SGR mouse reports."
-    (and (bound-and-true-p my/vterm-mouse-mode)
-         (not vterm-copy-mode)
-         (memq 1006 my/vterm--mouse-modes)
-         (seq-some (lambda (mode) (memq mode my/vterm--mouse-modes)) '(1000 1002 1003))))
-  (defun my/vterm-mouse--cell (posn)
-    "Return the 1-based terminal (COLUMN . ROW) under mouse position POSN.
-Counts buffer lines and columns rather than pixels, since lines drawn with a
-fallback font can be taller or narrower than the rest."
-    (with-current-buffer (window-buffer (posn-window posn))
-      (save-excursion
-        (goto-char (or (posn-point posn) (point-max)))
-        (let ((row (- (line-number-at-pos) (line-number-at-pos (my/vterm--screen-start)) -1))
-              ;; Past the end of a line there is no text; count cells from the pixels
-              (col (if (and (eolp) (> (car (posn-col-row posn t)) (current-column)))
-                       (- (car (posn-col-row posn t)) (vterm--get-margin-width))
-                     (current-column))))
-          (cons (1+ col)
-                (max 1 (min row (or my/vterm--rows row))))))))
-  (defun my/vterm-mouse--send (button posn final)
-    "Report mouse BUTTON at POSN to the program; FINAL is ?M (press) or ?m (release)."
-    (let ((cell (my/vterm-mouse--cell posn)))
-      (with-current-buffer (window-buffer (posn-window posn))
-        ;; One write, so the program cannot mistake the leading ESC for the Escape key
-        (process-send-string vterm--process (format "\e[<%d;%d;%d%c" button
-                                                    (car cell) (cdr cell) final)))))
-  (defun my/vterm-mouse--press (button)
-    "Return a command that reports a press of BUTTON, the drag, then the release."
-    (lambda (event)
-      (interactive "e")
-      (let* ((posn (event-start event))
-             (win (posn-window posn))
-             (cell (my/vterm-mouse--cell posn))
-             ev)
-        (select-window win)
-        (my/vterm-mouse--send button posn ?M)
-        ;; Report motion while the button is held, for dragging pane borders or
-        ;; selecting text, if the program asked for it (modes 1002 and 1003)
-        (track-mouse
-          (while (mouse-movement-p (setq ev (read-event)))
-            (let ((pos (event-start ev)))
-              (when (and (eq (posn-window pos) win)
-                         (seq-some (lambda (mode) (memq mode my/vterm--mouse-modes)) '(1002 1003))
-                         (not (equal cell (my/vterm-mouse--cell pos))))
-                (setq posn pos
-                      cell (my/vterm-mouse--cell pos))
-                (my/vterm-mouse--send (+ 32 button) pos ?M)))))
-        (if (and (memq (event-basic-type ev) '(mouse-1 mouse-2 mouse-3))
-                 (not (memq 'down (event-modifiers ev))))
-            (my/vterm-mouse--send button (if (eq (posn-window (event-end ev)) win)
-                                             (event-end ev)
-                                           posn)
-                                  ?m)
-          ;; Something other than the release (a key): release here, then handle it
-          (my/vterm-mouse--send button posn ?m)
-          (push ev unread-command-events)))))
-  (defun my/vterm-mouse--wheel (button)
-    "Return a command that reports wheel BUTTON (64 up, 65 down)."
-    (lambda (event)
-      (interactive "e")
-      (my/vterm-mouse--send button (event-start event) ?M)))
-  (defun my/vterm-mouse--filter (command)
-    "Return COMMAND while the program wants mouse reports, else nil (Emacs handles it)."
-    (and (my/vterm-mouse--active-p) command))
-  (define-minor-mode my/vterm-mouse-mode
-    "Forward the mouse to the program in this terminal whenever it asks for it.
-On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
-    :lighter (:eval (when (my/vterm-mouse--active-p) " Mouse"))
-    :keymap
-    (let ((map (make-sparse-keymap)))
-      (cl-flet ((bind (event command)
-                  (define-key map (vector event)
-                              `(menu-item "" ,command :filter my/vterm-mouse--filter))))
-        (pcase-dolist (`(,n . ,button) '((1 . 0) (2 . 1) (3 . 2)))
-          (dolist (prefix '("" "double-" "triple-"))
-            (bind (intern (format "%sdown-mouse-%d" prefix n)) (my/vterm-mouse--press button))
-            ;; The press command already reported the release
-            (bind (intern (format "%smouse-%d" prefix n)) #'ignore))
-          (bind (intern (format "drag-mouse-%d" n)) #'ignore))
-        ;; Fast scrolling sends double-/triple- wheel events; forward those too
-        (dolist (prefix '("" "double-" "triple-"))
-          (bind (intern (concat prefix "wheel-up")) (my/vterm-mouse--wheel 64))
-          (bind (intern (concat prefix "wheel-down")) (my/vterm-mouse--wheel 65))))
-      map))
+  (require 'tui-mouse)                  ; forward the mouse to TUIs (lisp/tui-mouse.el)
   (add-hook 'vterm-mode-hook
             (lambda ()
-              (setq my/vterm--rows (window-body-height)) ; the size vterm starts with
               ;; Box-drawing characters (TUI borders) draw slightly past their line,
               ;; so Emacs takes the cursor's line for cut off and scrolls one line,
               ;; hiding the screen's top row (such as a tab bar)
-              (setq-local make-cursor-line-fully-visible nil)
-              (my/vterm-mouse-mode 1)))
+              (setq-local make-cursor-line-fully-visible nil)))
   ;; When the program is not asking for the mouse, the wheel scrolls the
   ;; scrollback in Emacs, but the program's redraws keep jumping the view back
   ;; to the bottom.  Scrolling up freezes the terminal in copy mode; scrolling
@@ -569,7 +437,7 @@ On in every terminal; turn it off to select a TUI's text with the Emacs mouse."
      ["Terminal"
       ("t" "Project terminal" my/project-vterm)
       ("T" "New project terminal" (lambda () (interactive) (my/project-vterm t)))
-      ("M" "Toggle mouse forwarding" my/vterm-mouse-mode
+      ("M" "Toggle mouse forwarding" tui-mouse-mode
        :if (lambda () (derived-mode-p 'vterm-mode)))]]
     [["Buffers"
       ("b" "Switch buffer" consult-buffer)

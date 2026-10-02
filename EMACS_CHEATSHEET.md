@@ -217,15 +217,15 @@ The status buffer lists every worktree under **Worktrees** when there is more th
 
 ## Treemacs
 
-`F8` toggles the Treemacs sidebar. The keys below work inside the Treemacs window. Press `?` there for the full list.
+`F8` toggles the Treemacs sidebar. It lists every project (those in `local.el`'s `my/projects`, plus any you switch to); the active one is open and highlighted, the others collapsed. The active project follows the file you are in, or pick one with `C-x p p`, or a double-click or `RET` on its name. A collapsed project keeps its open folders for next time. The keys below work inside the Treemacs window. Press `?` there for the full list.
 
 ### Navigating and opening
 
 | Key | Action |
 |---|---|
 | `n` / `p` | Next / previous line |
-| `TAB` | Expand or collapse a folder |
-| `RET` | Open the file |
+| `TAB` | Expand or collapse a folder or project |
+| `RET` | Open the file; on a project's name, make it the active project |
 | `ov` | Open in a vertical split |
 | `oh` | Open in a horizontal split |
 | `P` | Toggle peek mode (preview files as you move) |
@@ -263,7 +263,7 @@ Works in any file buffer, no sidebar needed. Uses Git to list files, so it stays
 
 | Key | Action |
 |---|---|
-| `C-x p p` | Switch to another project: it shows in the sidebar with the folders you had open there, no buffer opens |
+| `C-x p p` | Switch to another project: it becomes the sidebar's active project, with the folders you had open there; no buffer opens |
 | `C-x p f` | Find a file in the current project |
 | `C-x p g` | Search the project with a regular expression |
 | `C-x p b` | Switch between buffers of this project |

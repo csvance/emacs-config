@@ -185,12 +185,12 @@ A reload keeps the view mode but not all of its drawing, so it looked wrong."
                   (julia-ts-mode :language-id "julia"))
                  "jetls" "serve" "--socket" :autoport)))
 
-;;;; Projects: switch with C-x p p; the Treemacs sidebar follows the current one
+;;;; Projects: switch with C-x p p; the Treemacs sidebar opens the current one
 (use-package project
   :ensure nil                         ; built in
   :init
   (defvar my/treemacs-pinned nil
-    "Non-nil while the sidebar keeps a project chosen with C-x p p.
+    "Non-nil while the sidebar keeps a project chosen with C-x p p or a double-click.
 Treemacs otherwise follows the selected buffer's project, which is still the
 old one until you open something in the new one.")
   (defun my/treemacs-unpin (frame)
@@ -201,16 +201,15 @@ old one until you open something in the new one.")
                          (window-list frame 'nomini)))
       (setq my/treemacs-pinned nil)))
   (add-hook 'window-buffer-change-functions #'my/treemacs-unpin)
-  (advice-add 'treemacs--do-follow-project :before-until (lambda () my/treemacs-pinned))
   (defun my/project-show-in-sidebar ()
     "Show the current project in the Treemacs sidebar and move there, opening no buffer."
     (interactive)
     (require 'treemacs)
     (setq my/treemacs-pinned t)
-    (let ((default-directory (project-root (project-current t))))
+    (let ((root (project-root (project-current t))))
       (unless (eq (treemacs-current-visibility) 'visible)
         (agents-sidebar-toggle))
-      (treemacs-add-and-display-current-project-exclusively)
+      (my/treemacs-activate root)
       (select-window (treemacs-get-local-window)))) ; treemacs-select-window would toggle back out
   :custom
   (project-switch-commands #'my/project-show-in-sidebar) ; no action menu, no new buffer
@@ -245,53 +244,89 @@ old one until you open something in the new one.")
       (agents-sidebar-toggle)))
   :config
   (treemacs-follow-mode 1)            ; highlight the current file
-  (treemacs-project-follow-mode 1)    ; show only the current buffer's project
   (treemacs-git-mode 'deferred)       ; color files by Git status
-  ;; The sidebar shows one project at a time, and switching replaces the old
-  ;; project's tree.  Remember each project's open folders and cursor so
-  ;; switching back finds it as you left it.
-  (defvar my/treemacs-states (make-hash-table :test #'equal)
-    "Per project root: (:open DIRS :point PATH), as last shown in Treemacs.")
-  (defun my/treemacs-save-state ()
-    "Remember the shown project's open folders and the node at the cursor."
-    (when-let* ((buf (treemacs-get-local-buffer))
-                (project (car (treemacs-workspace->projects (treemacs-current-workspace)))))
+  ;; Every project is listed; the active one is open and lit, the others
+  ;; collapsed.  The active project is the selected buffer's, or one chosen
+  ;; with C-x p p, a double-click or RET on its name.  A collapsed project
+  ;; keeps its open folders for when it is opened again.
+  (defface my/treemacs-active-project '((t :inherit (bold highlight)))
+    "Face of the active project's name in the sidebar.")
+  (defvar my/treemacs-active nil
+    "Root of the active project, as Treemacs spells it.")
+  (defun my/treemacs-add (root)
+    "Add ROOT to the sidebar's projects unless a listed project covers it.
+Return the project that covers ROOT."
+    (let* ((path (treemacs-canonical-path (file-truename root)))
+           (name (treemacs--filename path)))
+      (or (treemacs--find-project-for-path path)
+          (pcase (treemacs-do-add-project-to-workspace path name)
+            ;; Two checkouts with one folder name: tell them apart by their parent
+            (`(duplicate-name ,_)
+             (cadr (treemacs-do-add-project-to-workspace
+                    path (format "%s (%s)" name (treemacs--filename (file-name-directory path))))))
+            (`(success ,project) project)))))
+  (defun my/treemacs-light ()
+    "Light the active project's name in the sidebar."
+    (when-let* ((buf (treemacs-get-local-buffer)))
       (with-current-buffer buf
-        (let ((open nil)
-              (here (when-let* ((btn (treemacs-current-button)))
-                      (treemacs-button-get btn :path))))
+        (remove-overlays (point-min) (point-max) 'my/treemacs-active t)
+        (when-let* ((project (and my/treemacs-active
+                                  (treemacs--find-project-for-path my/treemacs-active)))
+                    (pos (treemacs-project->position project)))
           (save-excursion
-            (goto-char (point-min))
-            (while (not (eobp))
-              (when-let* ((btn (treemacs-current-button)))
-                (when (eq (treemacs-button-get btn :state) 'dir-node-open)
-                  (push (treemacs-button-get btn :path) open)))
-              (forward-line 1)))
-          (puthash (treemacs-project->path project)
-                   (list :open (nreverse open) :point here)
-                   my/treemacs-states)))))
-  (defun my/treemacs-restore-state ()
-    "Reopen the shown project's folders and return to its node, as last left."
+            (goto-char pos)
+            (let ((ov (make-overlay (line-beginning-position) (line-end-position))))
+              (overlay-put ov 'my/treemacs-active t)
+              (overlay-put ov 'face 'my/treemacs-active-project)))))))
+  (defun my/treemacs-activate (root)
+    "Make ROOT's project the active one: listed, open and lit, the others collapsed."
     (when-let* ((buf (treemacs-get-local-buffer))
-                (project (car (treemacs-workspace->projects (treemacs-current-workspace))))
-                (state (gethash (treemacs-project->path project) my/treemacs-states)))
+                (project (with-current-buffer buf (my/treemacs-add root))))
       (with-current-buffer buf
-        (dolist (dir (plist-get state :open)) ; in buffer order, so parents open first
-          (when (file-directory-p dir)
-            (treemacs-goto-node dir project)
-            (when-let* ((btn (treemacs-current-button)))
-              (when (and (equal (treemacs-button-get btn :path) dir)
-                         (treemacs-is-node-collapsed? btn))
-                (treemacs-toggle-node)))))
-        (when-let* ((here (plist-get state :point)))
-          (treemacs-goto-node here project))
+        (dolist (other (treemacs-workspace->projects (treemacs-current-workspace)))
+          (when-let* ((pos (treemacs-project->position other)))
+            (goto-char pos)                 ; expanding and collapsing act at point
+            (pcase (treemacs-button-get pos :state)
+              ('root-node-open (unless (eq other project) (treemacs--collapse-root-node pos)))
+              ('root-node-closed (when (eq other project) (treemacs--expand-root-node pos))))))
+        (setq my/treemacs-active (treemacs-project->path project))
+        (my/treemacs-light)
+        (goto-char (treemacs-project->position project))
         (when-let* ((win (get-buffer-window buf)))
           (set-window-point win (point))))))
-  (advice-add 'treemacs--show-single-project :around
-              (lambda (show &rest args)
-                (my/treemacs-save-state)
-                (prog1 (apply show args)
-                  (my/treemacs-restore-state)))))
+  (defun my/treemacs-activate-at-point ()
+    "Make the project whose name is at point the active one, as C-x p p would."
+    (interactive)
+    (when-let* ((project (treemacs-project-at-point)))
+      (setq my/treemacs-pinned t)
+      (my/treemacs-activate (treemacs-project->path project))))
+  (dolist (state '(root-node-open root-node-closed))
+    (setf (alist-get state treemacs-doubleclick-actions-config) #'my/treemacs-activate-at-point
+          (alist-get state treemacs-RET-actions-config) #'my/treemacs-activate-at-point))
+  (defvar my/treemacs--follow-timer nil)
+  (defun my/treemacs-follow (&rest _)
+    "Soon, activate the selected buffer's project, unless one chosen by hand is pinned."
+    (unless (timerp my/treemacs--follow-timer)
+      (setq my/treemacs--follow-timer
+            (run-with-idle-timer
+             0.2 nil
+             (lambda ()
+               (setq my/treemacs--follow-timer nil)
+               (unless (or my/treemacs-pinned (window-parameter nil 'window-side) (minibufferp))
+                 (when-let* ((proj (project-current nil))
+                             (root (treemacs-canonical-path (file-truename (project-root proj)))))
+                   (unless (and my/treemacs-active
+                                (treemacs-is-path root :in my/treemacs-active))
+                     (my/treemacs-activate root)))))))))
+  (add-hook 'window-buffer-change-functions #'my/treemacs-follow)
+  (add-hook 'window-selection-change-functions #'my/treemacs-follow)
+  (add-hook 'treemacs-post-project-refresh-functions (lambda (&rest _) (my/treemacs-light)))
+  ;; List the projects from local.el before the sidebar first opens, so
+  ;; Treemacs never asks for a first project
+  (treemacs--maybe-load-workspaces)
+  (dolist (dir my/projects)
+    (when (file-directory-p dir)
+      (my/treemacs-add dir))))
 
 (use-package treemacs-nerd-icons
   :after treemacs

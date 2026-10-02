@@ -9,7 +9,7 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 | `F1` | Personal menu: sessions and custom commands (see below). Help is on `C-h` |
 | `F2` | Agents menu: visit, start and stop campfire agents (see below) |
 | `F3` | Layouts: one window, one over an agent, or an editor and Magit over an agent (see below) |
-| `F4` | Notes: start, find or search notes in `~/Git/notes` (see below) |
+| `F4` | Notes: start, find or search notes in `~/Notes` (see below) |
 | `F7` | Mode toggle: Markdown rendered view (read-only) or editing; inline type hints in language server buffers |
 | `F8` | Toggle the sidebar: Treemacs, with the agents pane below it |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
@@ -28,7 +28,7 @@ Arranges the editing area beside the sidebar. In the two tiled layouts, Claude C
 
 ## Notes (F4)
 
-Notes are Markdown files in `~/Git/notes`, named like `20261001T142315--fix-bazel-cache__bazel_disk.md` with the same title and tags in their YAML front matter. A new note starts untitled: just type and save. On save, the local model (`local-llm-host` and `local-llm-model`, set in `local.el`) titles and tags it in the background, reusing tags you already have, and the file is renamed; Emacs never waits for it. A title or tags you set yourself are kept.
+Notes are Markdown files in `~/Notes`, named like `20261001T142315--fix-bazel-cache__bazel_disk.md` with the same title and tags in their YAML front matter. A new note starts untitled: just type and save. On save, the local model (`local-llm-host` and `local-llm-model`, set in `local.el`) titles and tags it in the background, reusing tags you already have, and the file is renamed; Emacs never waits for it. A title or tags you set yourself are kept.
 
 | Key | Action |
 |---|---|
@@ -37,7 +37,7 @@ Notes are Markdown files in `~/Git/notes`, named like `20261001T142315--fix-baze
 | `s` | Search the text of all notes |
 | `t` | Title and tag the current note now, replacing what it has |
 | `r` | Rename the current note yourself |
-| `d` | Open `~/Git/notes` in Dired |
+| `d` | Open `~/Notes` in Dired |
 
 ## Personal menu (F1)
 

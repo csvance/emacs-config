@@ -1,4 +1,4 @@
-;;; notes.el --- Notes in ~/Git/notes, titled and tagged by a local model -*- lexical-binding: t; -*-
+;;; notes.el --- Notes in ~/Notes, titled and tagged by a local model -*- lexical-binding: t; -*-
 
 ;;; Commentary:
 
@@ -25,7 +25,7 @@
   "Characters of text a note needs before the model is asked to title it."
   :type 'integer)
 
-(setq denote-directory (expand-file-name "~/Git/notes/")
+(setq denote-directory (expand-file-name "~/Notes/")
       denote-file-type 'markdown-yaml
       denote-prompts nil               ; a new note asks nothing
       denote-known-keywords nil)       ; tags come only from your notes
@@ -151,7 +151,7 @@ On save this runs only for an untitled, untagged note; with FORCE
   (consult-ripgrep denote-directory))
 
 (transient-define-prefix notes-menu ()
-  "Notes in ~/Git/notes."
+  "Notes in ~/Notes."
   [["Notes"
     ("n" "New note" notes-new)
     ("f" "Find a note" notes-find)
@@ -160,7 +160,7 @@ On save this runs only for an untitled, untagged note; with FORCE
     ("t" "Title and tag it now" notes-title)
     ("r" "Rename it yourself" denote-rename-file)]
    ["Folder"
-    ("d" "Open ~/Git/notes" (lambda () (interactive) (dired denote-directory)))]])
+    ("d" "Open ~/Notes" (lambda () (interactive) (dired denote-directory)))]])
 
 (provide 'notes)
 ;;; notes.el ends here

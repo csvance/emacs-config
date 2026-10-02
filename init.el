@@ -243,6 +243,7 @@ old one until you open something in the new one.")
     (unless (daemonp)
       (agents-sidebar-toggle)))
   :config
+  (setq treemacs-space-between-root-nodes nil) ; projects on consecutive lines
   (treemacs-follow-mode 1)            ; highlight the current file
   (treemacs-git-mode 'deferred)       ; color files by Git status
   ;; Every project is listed; the active one is open and lit, the others

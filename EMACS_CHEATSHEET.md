@@ -28,13 +28,14 @@ Arranges the editing area beside the sidebar. In the two tiled layouts, Claude C
 
 ## Notes (F4)
 
-Notes are Markdown files in `~/Notes`, named like `20261001T142315--fix-bazel-cache__bazel_disk.md` with the same title and tags in their YAML front matter. A new note starts untitled: just type and save. On save, the local model (`local-llm-host` and `local-llm-model`, set in `local.el`) titles and tags it in the background, reusing tags you already have, and the file is renamed; Emacs never waits for it. A title or tags you set yourself are kept.
+Notes are Markdown files in `~/Notes`, named like `20261001T142315--fix-bazel-cache__bazel_disk.md` with the same title and tags in their YAML front matter. A new note starts untitled: just type. When you press `C-x C-s`, or after 90 seconds without an edit, the local model (`local-llm-host` and `local-llm-model`, set in `local.el`) titles and tags it in the background, reusing tags you already have, and the file is renamed; Emacs never waits for it. A title or tags you set yourself are kept.
 
 | Key | Action |
 |---|---|
 | `n` | New note |
 | `f` | Find a note by title and tags; type `__bazel` to narrow to a tag |
 | `s` | Search the text of all notes |
+| `u` | Title every note that is still untitled, such as one closed before it was titled |
 | `t` | Title and tag the current note now, replacing what it has |
 | `r` | Rename the current note yourself |
 | `d` | Open `~/Notes` in Dired |

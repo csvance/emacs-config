@@ -360,12 +360,12 @@ With prefix argument NEW, always open another terminal."
   :demand t                           ; its display rule must be in place before any agent opens
   :bind ("<f3>" . layouts-menu))
 
-;;;; Notes: F4.  Denote files in ~/Notes, titled and tagged on save by the local model
+;;;; Notes: F4.  Denote files in ~/Notes, titled and tagged by the local model
 (use-package denote :defer t)
 (use-package gptel :defer t)
 (use-package notes
   :ensure nil
-  :demand t                           ; its save hook titles notes opened any way
+  :demand t                           ; its find-file hook covers notes opened any way
   :bind ("<f4>" . notes-menu))
 
 ;;;; Quality of life

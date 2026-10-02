@@ -4,10 +4,14 @@
 
 ;; Notes are Denote files: Markdown with YAML front matter, named
 ;; ID--title__tag1_tag2.md, so any tool can find them.  A new note starts
-;; untitled; type and save.  On save, an untitled, untagged note goes to the
-;; local model (lisp/local-llm.el) in the background, and its reply renames
-;; the file and fills in the front matter.  A title or
-;; tags you set yourself are never replaced.  F4 opens the menu.
+;; untitled; type, and it is titled when you save it with C-x C-s or leave it
+;; unedited for `notes-title-idle-delay' seconds.  The saves that
+;; `auto-save-visited-mode' makes every few seconds do not count, or a note
+;; would be titled from its first sentence.  An untitled, untagged note goes
+;; to the local model (lisp/local-llm.el) in the background, and its reply
+;; renames the file and fills in the front matter.  A title or tags you set
+;; yourself are never replaced.  F4 opens the menu; F4 u titles every note
+;; that was closed before either happened.
 
 ;;; Code:
 
@@ -29,6 +33,10 @@
       denote-file-type 'markdown-yaml
       denote-prompts nil               ; a new note asks nothing
       denote-known-keywords nil)       ; tags come only from your notes
+
+(defcustom notes-title-idle-delay 90
+  "Seconds a note goes unedited before it is titled, if it is still untitled."
+  :type 'integer)
 
 (defcustom notes-prompt-tag-limit 40
   "How many of the most used tags the model is shown."
@@ -95,43 +103,126 @@ eight words that says what the note is about, and one to three short lowercase t
         (denote-rename-file file title tags 'keep-current 'keep-current 'keep-current))
       (message "Note titled: %s" title))))
 
+(defun notes--request (buffer force &optional done)
+  "Title the note in BUFFER in the background; non-nil if a request was sent.
+Only an untitled, untagged note is sent, unless FORCE.  DONE, if given, is
+called once the reply is handled, with non-nil if the note was renamed."
+  (with-current-buffer buffer
+    (let ((file buffer-file-name))
+      (when (and (local-llm-available-p)
+                 file (denote-file-is-in-denote-directory-p file)
+                 (denote-file-has-denoted-filename-p file)
+                 (or force (notes--untitled-p file))
+                 (not notes--pending)
+                 (>= (length (notes--body)) notes-min-length))
+        (setq notes--pending t)
+        (local-llm-request
+         (notes--body) (notes--prompt) notes--schema
+         (lambda (data problem)
+           (let ((titled nil))
+             (when (buffer-live-p buffer)
+               (with-current-buffer buffer (setq notes--pending nil))
+               (let ((file (buffer-file-name buffer)))
+                 (cond
+                  (problem (message "Could not title the note: %s" problem))
+                  ;; A title or tags you set while the request was out are kept
+                  ((and file (or force (notes--untitled-p file)))
+                   (condition-case err
+                       (progn (notes--apply buffer file data)
+                              (setq titled t))
+                     (error (message "Could not title the note: %s"
+                                     (error-message-string err))))))))
+             (when done (funcall done titled)))))
+        t))))
+
 (defun notes-title (&optional force)
   "Ask the local model to title and tag this note, in the background.
-On save this runs only for an untitled, untagged note; with FORCE
+Without FORCE this runs only for an untitled, untagged note; with FORCE
 \(interactively, always), retitle it anyway."
   (interactive (list t))
-  (let ((file buffer-file-name)
-        (buffer (current-buffer)))
-    (when (and (local-llm-available-p)
-               file (denote-file-is-in-denote-directory-p file)
-               (denote-file-has-denoted-filename-p file)
-               (or force (notes--untitled-p file))
-               (not notes--pending)
-               (>= (length (notes--body)) notes-min-length))
-      (setq notes--pending t)
-      (local-llm-request
-       (notes--body) (notes--prompt) notes--schema
-       (lambda (data problem)
-         (when (buffer-live-p buffer)
-           (with-current-buffer buffer (setq notes--pending nil))
-           (let ((file (buffer-file-name buffer)))
-             (cond
-              (problem (message "Could not title the note: %s" problem))
-              ;; A title or tags you set while the request was out are kept
-              ((and file (or force (notes--untitled-p file)))
-               (condition-case err
-                   (notes--apply buffer file data)
-                 (error (message "Could not title the note: %s"
-                                 (error-message-string err)))))))))))))
+  (notes--request (current-buffer) force))
 
-(defun notes--maybe-title ()
-  "On save, title an untitled note in the background."
+(defun notes-save ()
+  "Save the note, then title it if it is still untitled."
+  (interactive)
+  (save-buffer)
   (notes-title))
 
-(add-hook 'after-save-hook #'notes--maybe-title)
+(defvar-local notes--idle-timer nil
+  "Timer that titles this note once it has gone unedited for a while.")
+
+(defun notes--cancel-timer ()
+  "Cancel this note's titling timer."
+  (when (timerp notes--idle-timer)
+    (cancel-timer notes--idle-timer)
+    (setq notes--idle-timer nil)))
+
+(defun notes--schedule (&rest _)
+  "After an edit, restart this note's titling timer."
+  (notes--cancel-timer)
+  (setq notes--idle-timer
+        (run-with-timer notes-title-idle-delay nil #'notes--idle-fire (current-buffer))))
+
+(defun notes--idle-fire (buffer)
+  "Title the note in BUFFER, which has gone unedited for a while."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (setq notes--idle-timer nil)
+      (notes-title))))
+
+(defvar notes-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [remap save-buffer] #'notes-save)
+    map)
+  "Keymap for `notes-mode': C-x C-s also titles an untitled note.")
+
+(define-minor-mode notes-mode
+  "Title this untitled note on C-x C-s or after it goes unedited for a while."
+  :lighter " Note"
+  (if notes-mode
+      (progn (add-hook 'after-change-functions #'notes--schedule nil t)
+             (add-hook 'kill-buffer-hook #'notes--cancel-timer nil t))
+    (remove-hook 'after-change-functions #'notes--schedule t)
+    (remove-hook 'kill-buffer-hook #'notes--cancel-timer t)
+    (notes--cancel-timer)))
+
+(defun notes--maybe-enable ()
+  "Turn on `notes-mode' in a note."
+  (when (and buffer-file-name
+             (denote-file-is-in-denote-directory-p buffer-file-name)
+             (denote-file-has-denoted-filename-p buffer-file-name))
+    (notes-mode 1)))
+
+(add-hook 'find-file-hook #'notes--maybe-enable)
+
+(defun notes-title-untitled ()
+  "Title every untitled note, one at a time, in the background."
+  (interactive)
+  (let ((files (seq-filter (lambda (f) (and (denote-file-has-denoted-filename-p f)
+                                            (notes--untitled-p f)))
+                           (denote-directory-files nil nil t))))
+    (if files
+        (progn (message "Titling %d untitled notes..." (length files))
+               (notes--sweep files 0))
+      (message "No untitled notes"))))
+
+(defun notes--sweep (files count)
+  "Title FILES one after another; COUNT have been titled so far."
+  (if (null files)
+      (message "Titled %d notes" count)
+    (let* ((open (find-buffer-visiting (car files)))
+           (buffer (or open (find-file-noselect (car files))))
+           (next (lambda (titled)
+                   ;; Close what the sweep opened, unless it has unsaved edits
+                   (when (and (not open) (buffer-live-p buffer)
+                              (not (buffer-modified-p buffer)))
+                     (kill-buffer buffer))
+                   (notes--sweep (cdr files) (if titled (1+ count) count)))))
+      (unless (notes--request buffer nil next)
+        (funcall next nil)))))
 
 (defun notes-new ()
-  "Start an untitled note.  Saving it asks the model for a title and tags."
+  "Start an untitled note.  The model titles and tags it when you save it."
   (interactive)
   (make-directory denote-directory t)
   (denote "" nil))
@@ -155,7 +246,8 @@ On save this runs only for an untitled, untagged note; with FORCE
   [["Notes"
     ("n" "New note" notes-new)
     ("f" "Find a note" notes-find)
-    ("s" "Search note text" notes-search)]
+    ("s" "Search note text" notes-search)
+    ("u" "Title untitled notes" notes-title-untitled)]
    ["This note"
     ("t" "Title and tag it now" notes-title)
     ("r" "Rename it yourself" denote-rename-file)]

@@ -54,6 +54,10 @@ When COMMAND exits, the buffer closes.")
                 (unless (frame-focus-state)
                   (save-some-buffers t))))    ; t = save all without asking
 
+;; Files changed on disk (an agent's report, a git checkout) reload by themselves,
+;; unless they have unsaved edits.  Polling covers NFS, where change notices miss.
+(global-auto-revert-mode 1)
+
 ;; No clutter next to your files.  Saving the file itself every few seconds
 ;; (above) makes the #file# auto-save copies redundant, the .#file lock files
 ;; only guard against a second Emacs editing the same file, and file~ backups
@@ -232,7 +236,52 @@ old one until you open something in the new one.")
   :config
   (treemacs-follow-mode 1)            ; highlight the current file
   (treemacs-project-follow-mode 1)    ; show only the current buffer's project
-  (treemacs-git-mode 'deferred))      ; color files by Git status
+  (treemacs-git-mode 'deferred)       ; color files by Git status
+  ;; The sidebar shows one project at a time, and switching replaces the old
+  ;; project's tree.  Remember each project's open folders and cursor so
+  ;; switching back finds it as you left it.
+  (defvar my/treemacs-states (make-hash-table :test #'equal)
+    "Per project root: (:open DIRS :point PATH), as last shown in Treemacs.")
+  (defun my/treemacs-save-state ()
+    "Remember the shown project's open folders and the node at the cursor."
+    (when-let* ((buf (treemacs-get-local-buffer))
+                (project (car (treemacs-workspace->projects (treemacs-current-workspace)))))
+      (with-current-buffer buf
+        (let ((open nil)
+              (here (when-let* ((btn (treemacs-current-button)))
+                      (treemacs-button-get btn :path))))
+          (save-excursion
+            (goto-char (point-min))
+            (while (not (eobp))
+              (when-let* ((btn (treemacs-current-button)))
+                (when (eq (treemacs-button-get btn :state) 'dir-node-open)
+                  (push (treemacs-button-get btn :path) open)))
+              (forward-line 1)))
+          (puthash (treemacs-project->path project)
+                   (list :open (nreverse open) :point here)
+                   my/treemacs-states)))))
+  (defun my/treemacs-restore-state ()
+    "Reopen the shown project's folders and return to its node, as last left."
+    (when-let* ((buf (treemacs-get-local-buffer))
+                (project (car (treemacs-workspace->projects (treemacs-current-workspace))))
+                (state (gethash (treemacs-project->path project) my/treemacs-states)))
+      (with-current-buffer buf
+        (dolist (dir (plist-get state :open)) ; in buffer order, so parents open first
+          (when (file-directory-p dir)
+            (treemacs-goto-node dir project)
+            (when-let* ((btn (treemacs-current-button)))
+              (when (and (equal (treemacs-button-get btn :path) dir)
+                         (treemacs-is-node-collapsed? btn))
+                (treemacs-toggle-node)))))
+        (when-let* ((here (plist-get state :point)))
+          (treemacs-goto-node here project))
+        (when-let* ((win (get-buffer-window buf)))
+          (set-window-point win (point))))))
+  (advice-add 'treemacs--show-single-project :around
+              (lambda (show &rest args)
+                (my/treemacs-save-state)
+                (prog1 (apply show args)
+                  (my/treemacs-restore-state)))))
 
 (use-package treemacs-nerd-icons
   :after treemacs

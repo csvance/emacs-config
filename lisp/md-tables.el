@@ -197,6 +197,7 @@ wrapped so the table fits in MAX-WIDTH columns."
   (remove-overlays (point-min) (point-max) 'md-table t)
   (setq md-tables--width (md-tables--width))
   (add-hook 'window-size-change-functions #'md-tables--resized nil t)
+  (add-hook 'after-revert-hook #'md-tables-render nil t) ; a reload replaces the text drawn over
   (font-lock-ensure)                    ; hidden markup is marked by fontification
   (save-excursion
     (goto-char (point-min))
@@ -239,6 +240,7 @@ wrapped so the table fits in MAX-WIDTH columns."
   "Remove the drawn tables, showing the Markdown source again."
   (interactive)
   (remove-hook 'window-size-change-functions #'md-tables--resized t)
+  (remove-hook 'after-revert-hook #'md-tables-render t)
   (setq md-tables--width nil)
   (remove-overlays (point-min) (point-max) 'md-table t))
 

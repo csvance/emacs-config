@@ -121,17 +121,20 @@ When COMMAND exits, the buffer closes.")
   :custom
   (markdown-fontify-code-blocks-natively t) ; highlight fenced code in its own language
   :config
+  (require 'md-tables)
   (defun my/markdown-view ()
-    "Show the current Markdown buffer rendered: markup hidden, larger headings, read-only."
+    "Show the current Markdown buffer rendered: markup hidden, larger headings, tables drawn, read-only."
     (gfm-view-mode)
     ;; Scale headings in this buffer only; `markdown-header-scaling' would resize them everywhere
     (dotimes (n 6)
       (face-remap-add-relative (intern (format "markdown-header-face-%d" (1+ n)))
-                               :height (float (nth n markdown-header-scaling-values)))))
+                               :height (float (nth n markdown-header-scaling-values))))
+    (md-tables-render))                 ; lisp/md-tables.el: pipe tables as box-drawn grids
   (defun my/markdown-edit ()
     "Leave the rendered view and edit the file in its usual Markdown mode."
     (interactive)
     (read-only-mode -1)
+    (md-tables-clear)
     (normal-mode)))                   ; reapplies the auto-mode-alist choice; drops the heading remaps
 
 ;; Tree-sitter modes give richer, more accurate highlighting.

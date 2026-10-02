@@ -11,7 +11,7 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 | `F3` | Layouts: one window, one over an agent, or an editor and Magit over an agent (see below) |
 | `F4` | Notes: start, find or search notes in `~/Notes` (see below) |
 | `F5` | Blog: start, find, preview and render Quarto posts in `~/Git/csvance.github.io` (see below) |
-| `F7` | Mode toggle: Markdown rendered view (read-only) or editing; inline type hints in language server buffers |
+| `F7` | Mode toggle: Markdown rendered view (read-only, tables drawn as grids) or editing; inline type hints in language server buffers |
 | `F8` | Toggle the sidebar: Treemacs, with the agents pane below it |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |

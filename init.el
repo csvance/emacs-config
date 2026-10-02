@@ -133,7 +133,17 @@ When COMMAND exits, the buffer closes.")
     (dotimes (n 6)
       (face-remap-add-relative (intern (format "markdown-header-face-%d" (1+ n)))
                                :height (float (nth n markdown-header-scaling-values))))
-    (md-tables-render))                 ; lisp/md-tables.el: pipe tables as box-drawn grids
+    (md-tables-render)                  ; lisp/md-tables.el: pipe tables as box-drawn grids
+    (add-hook 'after-revert-hook #'my/markdown-view-refresh nil t))
+  (defun my/markdown-view-refresh ()
+    "After the file reloads in the rendered view, leave the view and enter it again.
+A reload keeps the view mode but not all of its drawing, so it looked wrong."
+    (let ((starts (mapcar (lambda (w) (cons w (window-start w)))
+                          (get-buffer-window-list nil nil t))))
+      (my/markdown-edit)
+      (my/markdown-view)
+      (dolist (start starts)              ; stay scrolled where you were
+        (set-window-start (car start) (cdr start) t))))
   (defun my/markdown-edit ()
     "Leave the rendered view and edit the file in its usual Markdown mode."
     (interactive)

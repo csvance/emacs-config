@@ -5,15 +5,14 @@
 ;; Notes are Denote files: Markdown with YAML front matter, named
 ;; ID--title__tag1_tag2.md, so any tool can find them.  A new note starts
 ;; untitled; type and save.  On save, an untitled, untagged note goes to the
-;; local model (an OpenAI-compatible server such as vLLM, set in local.el, its
-;; key in secrets/authinfo) in the background,
-;; and its reply renames the file and fills in the front matter.  A title or
+;; local model (lisp/local-llm.el) in the background, and its reply renames
+;; the file and fills in the front matter.  A title or
 ;; tags you set yourself are never replaced.  F4 opens the menu.
 
 ;;; Code:
 
 (require 'denote)
-(require 'gptel)
+(require 'local-llm)
 (require 'transient)
 
 (declare-function consult-ripgrep "consult")
@@ -31,30 +30,13 @@
       denote-prompts nil               ; a new note asks nothing
       denote-known-keywords nil)       ; tags come only from your notes
 
-(defcustom notes-model-host nil
-  "HOST:PORT of the OpenAI-compatible server that titles notes, over HTTPS.
-It is also the machine name of the server's key in secrets/authinfo.  Set in
-local.el; while it is nil, notes are not titled."
-  :type '(choice (const nil) string))
-
-(defcustom notes-model nil
-  "Name of the model on `notes-model-host' that titles notes.  Set in local.el."
-  :type '(choice (const nil) string))
-
-(defun notes--backend ()
-  "The gptel backend for `notes-model-host' and `notes-model'."
-  (let ((host notes-model-host))
-    (gptel-make-openai "notes"
-      :host host
-      :key (lambda () (gptel-api-key-from-auth-source host))
-      :protocol "https"
-      :endpoint "/v1/chat/completions"
-      :stream nil
-      :models (list (intern notes-model)))))
+(defcustom notes-prompt-tag-limit 40
+  "How many of the most used tags the model is shown."
+  :type 'integer)
 
 (defconst notes--schema
   '(:type "object"
-    :properties (:title (:type "string")
+    :properties (:title (:type "string" :maxLength 80)
                  :tags (:type "array" :items (:type "string") :minItems 1 :maxItems 3))
     :required ["title" "tags"]
     :additionalProperties :json-false)
@@ -65,7 +47,18 @@ local.el; while it is nil, notes are not titled."
   (format "You title and tag personal technical notes. Reply with a title of at most
 eight words that says what the note is about, and one to three short lowercase tags
 (single words, no spaces). Reuse existing tags when they fit. Existing tags: %s"
-          (if-let* ((tags (denote-keywords))) (string-join tags ", ") "none yet")))
+          (if-let* ((tags (notes--common-tags))) (string-join tags ", ") "none yet")))
+
+(defun notes--common-tags ()
+  "The `notes-prompt-tag-limit' most used tags, most used first."
+  (let ((counts (make-hash-table :test #'equal))
+        pairs)
+    (dolist (file (denote-directory-files nil nil t))
+      (dolist (tag (denote-extract-keywords-from-path file))
+        (puthash tag (1+ (gethash tag counts 0)) counts)))
+    (maphash (lambda (tag n) (push (cons tag n) pairs)) counts)
+    (seq-take (mapcar #'car (sort pairs (lambda (a b) (> (cdr a) (cdr b)))))
+              notes-prompt-tag-limit)))
 
 (defun notes--body ()
   "The note's text, without its front matter."
@@ -83,13 +76,19 @@ eight words that says what the note is about, and one to three short lowercase t
   (and (not (denote-retrieve-filename-title file))
        (not (denote-retrieve-filename-keywords file))))
 
-(defun notes--apply (buffer file reply)
-  "Rename FILE, shown in BUFFER, from the model's REPLY."
-  (let* ((data (json-parse-string reply :object-type 'plist :array-type 'list))
-         (title (string-trim (plist-get data :title)))
+(defun notes--clamp-title (title)
+  "TITLE trimmed to eight words and 80 characters."
+  (let ((short (string-join (seq-take (split-string (or title "")) 8) " ")))
+    (truncate-string-to-width short 80)))
+
+(defun notes--apply (buffer file data)
+  "Rename FILE, shown in BUFFER, from the model's reply DATA."
+  (let* ((title (notes--clamp-title (plist-get data :title)))
          (tags (seq-take (seq-remove #'string-empty-p
                                      (mapcar #'denote-sluggify-keyword (plist-get data :tags)))
                          3)))
+    (when (string-empty-p title)
+      (error "The model gave no title"))
     (with-current-buffer buffer
       (let ((denote-rename-confirmations nil)
             (denote-save-buffers t))
@@ -103,28 +102,27 @@ On save this runs only for an untitled, untagged note; with FORCE
   (interactive (list t))
   (let ((file buffer-file-name)
         (buffer (current-buffer)))
-    (when (and notes-model-host notes-model
+    (when (and (local-llm-available-p)
                file (denote-file-is-in-denote-directory-p file)
                (denote-file-has-denoted-filename-p file)
                (or force (notes--untitled-p file))
                (not notes--pending)
                (>= (length (notes--body)) notes-min-length))
       (setq notes--pending t)
-      (let* ((gptel-backend (notes--backend))
-             (gptel-model (car (gptel-backend-models gptel-backend)))
-             (gptel-use-tools nil))
-        (gptel-request (notes--body)
-          :system (notes--prompt)
-          :schema notes--schema
-          :callback
-          (lambda (reply info)
-            (when (buffer-live-p buffer)
-              (with-current-buffer buffer (setq notes--pending nil))
-              (if (stringp reply)
-                  (condition-case err
-                      (notes--apply buffer (buffer-file-name buffer) reply)
-                    (error (message "Could not title the note: %s" (error-message-string err))))
-                (message "Could not title the note: %s" (plist-get info :status))))))))))
+      (local-llm-request
+       (notes--body) (notes--prompt) notes--schema
+       (lambda (data problem)
+         (when (buffer-live-p buffer)
+           (with-current-buffer buffer (setq notes--pending nil))
+           (let ((file (buffer-file-name buffer)))
+             (cond
+              (problem (message "Could not title the note: %s" problem))
+              ;; A title or tags you set while the request was out are kept
+              ((and file (or force (notes--untitled-p file)))
+               (condition-case err
+                   (notes--apply buffer file data)
+                 (error (message "Could not title the note: %s"
+                                 (error-message-string err)))))))))))))
 
 (defun notes--maybe-title ()
   "On save, title an untitled note in the background."

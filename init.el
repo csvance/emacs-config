@@ -114,7 +114,8 @@ When COMMAND exits, the buffer closes.")
 (use-package dockerfile-mode
   :mode ("\\(?:Container\\|Docker\\)file\\(?:\\..*\\)?\\'" . dockerfile-mode))
 (use-package markdown-mode
-  :mode ("README\\.md\\'" . gfm-mode)  ; GitHub flavor for READMEs; other .md files use markdown-mode
+  :mode (("README\\.md\\'" . gfm-mode) ; GitHub flavor for READMEs; other .md files use markdown-mode
+         ("\\.qmd\\'" . markdown-mode)) ; Quarto: Markdown with ```{julia} cells
   :bind (:map markdown-view-mode-map   ; shared by gfm-view-mode
               ("e" . my/markdown-edit))
   :custom
@@ -367,6 +368,11 @@ With prefix argument NEW, always open another terminal."
   :ensure nil
   :demand t                           ; its find-file hook covers notes opened any way
   :bind ("<f4>" . notes-menu))
+
+;;;; Blog: F5.  Quarto posts in ~/Git/csvance.github.io (lisp/blog.el)
+(use-package blog
+  :ensure nil
+  :bind ("<f5>" . blog-menu))
 
 ;;;; Quality of life
 (setq inhibit-startup-screen t)

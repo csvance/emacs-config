@@ -10,6 +10,7 @@ Key notation: `C-` is Ctrl, `M-` is Alt (Meta), `S-` is Shift. `C-x g` means pre
 | `F2` | Agents menu: visit, start and stop campfire agents (see below) |
 | `F3` | Layouts: one window, one over an agent, or an editor and Magit over an agent (see below) |
 | `F4` | Notes: start, find or search notes in `~/Notes` (see below) |
+| `F5` | Blog: start, find, preview and render Quarto posts in `~/Git/csvance.github.io` (see below) |
 | `F7` | Mode toggle: Markdown rendered view (read-only) or editing; inline type hints in language server buffers |
 | `F8` | Toggle the sidebar: Treemacs, with the agents pane below it |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
@@ -39,6 +40,19 @@ Notes are Markdown files in `~/Notes`, named like `20261001T142315--fix-bazel-ca
 | `t` | Title and tag the current note now, replacing what it has |
 | `r` | Rename the current note yourself |
 | `d` | Open `~/Notes` in Dired |
+
+## Blog (F5)
+
+Posts are Quarto files (`.qmd`) in `~/Git/csvance.github.io/posts/DATE-SLUG/index.qmd`. They open in Markdown mode, so `F7` shows them rendered, and code cells such as ```` ```{julia} ```` are highlighted as Julia. Previewing serves the page at a local URL (click it in the `*quarto preview*` buffer) and re-renders it each time the file is saved; `C-c C-k` there stops it.
+
+| Key | Action |
+|---|---|
+| `n` | New draft post: asks for a title and fills in the front matter |
+| `f` | Find a post, newest first |
+| `p` | Preview the current post, or the whole site outside a post |
+| `r` | Render the whole site into `_site` |
+| `g` | Magit status for the blog, to commit and push |
+| `d` | Open the blog folder in Dired |
 
 ## Personal menu (F1)
 

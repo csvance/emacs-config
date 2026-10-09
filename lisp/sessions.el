@@ -70,7 +70,8 @@ Plists like the entries of `my/vterm-sessions'.")
               (rest (cdr (member "ssh" words))))
     (while (and rest (string-prefix-p "-" (car rest)))
       (setq rest (if (member (car rest) sessions--ssh-arg-options) (cddr rest) (cdr rest))))
-    (car rest)))
+    ;; `sessions-new' quotes the destination with backslashes, as in cvance\@host
+    (and (car rest) (replace-regexp-in-string "\\\\\\(.\\)" "\\1" (car rest)))))
 
 (defun sessions--host (session)
   "Host label of SESSION: its :host, else its SSH host, else \"local\"."

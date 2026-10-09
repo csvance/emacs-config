@@ -609,8 +609,11 @@ WORKSPACES is the parsed `workspace list'."
 
 (defun agents-sidebar-bar (title)
   "A `header-line-format' showing TITLE, which drags to resize the pane."
-  (propertize (concat " " title) 'face '(:inherit header-line :weight bold)
-              'keymap agents--bar-map 'pointer 'vdrag
+  ;; Padded to the full width, so the whole bar shows the pointer and takes the drag
+  (propertize (concat " " title (propertize " " 'display '(space :align-to right)))
+              'face '(:inherit header-line :weight bold)
+              'keymap agents--bar-map
+              'pointer 'nhdrag          ; the up-down arrow, as over a draggable mode line
               'help-echo "Drag to resize"))
 
 ;;;; Status pane

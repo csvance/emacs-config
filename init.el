@@ -21,7 +21,7 @@
 ;;   (setq revise-sync-default-host "user@repl-host")
 ;;   (setq revise-sync-projects '("~/Git/some-repo" ("~/Git/other-repo" . "other-host")))
 ;;   (setq my/vterm-sessions
-;;         '((:name "remote" :title "Remote tool" :key "<f6>" :menu "r"
+;;         '((:name "remote" :title "Remote tool" :key "C-c r" :menu "r"
 ;;            :command "ssh -t user@host some-command")
 ;;           (:name "remote-shell" :title "Remote shell in a directory" :menu "s"
 ;;            :command "ssh -t user@host 'cd ~/some/dir && exec $SHELL -l'")))

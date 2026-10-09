@@ -13,7 +13,7 @@
 ;; The agent tile is a bottom side window, so C-x 1, C-x 2 and C-x 3 in the
 ;; editing area leave it alone.  While a layout has one, every Claude Code
 ;; agent buffer (`*agent: ...*', from lisp/agents.el) opens there, however it
-;; is visited: F2, the agents pane, or C-x b.  F3 picks the layout.
+;; is visited: F2, the agents pane, or C-x b.  M-x layouts-menu picks the layout.
 
 ;;; Code:
 
@@ -35,7 +35,7 @@
   '((single . "One window")
     (stacked . "One window over an agent")
     (split . "Editor and Magit over an agent"))
-  "Each layout's description in the F3 menu.")
+  "Each layout's description in `layouts-menu'.")
 
 ;; Left side windows (the sidebar) take the full frame height, so the bottom
 ;; tile spans only the editing area rather than running under the sidebar.

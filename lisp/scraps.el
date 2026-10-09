@@ -5,7 +5,7 @@
 ;; A scrap is a block of text kept for reference until you close it: a command,
 ;; a path, a reply to copy back out.  Each is a buffer backed by a file in
 ;; `scraps-directory', saved as you type, so scraps survive a restart, and a tab
-;; line across the top of a scrap's window lists them all.  F6 opens a menu: a
+;; line across the top of a scrap's window lists them all.  F3 opens a menu: a
 ;; new scrap from the latest kill (so whatever a program copied), visit one by
 ;; number, copy one out, close one or close them all.  Closing deletes the file
 ;; (to the trash); the title, from the local model (lisp/local-llm.el), is kept
@@ -107,7 +107,7 @@
 (add-hook 'kill-emacs-hook #'scraps--save-all)
 
 (defun scraps--tab-name (buffer &optional _buffers)
-  "Tab name of BUFFER: its number, for F6, and its label."
+  "Tab name of BUFFER: its number, for F3, and its label."
   (format " %d %s " (1+ (or (cl-position buffer (scraps--buffers)) 0)) (scraps--label buffer)))
 
 (defvar-keymap scraps-mode-map
@@ -301,7 +301,7 @@ The request runs in the background; the title goes in the file and buffer names.
 (add-hook 'window-selection-change-functions #'scraps--note-leaving)
 (add-hook 'window-buffer-change-functions #'scraps--note-leaving)
 
-;;;; F6 menu
+;;;; F3 menu
 
 (defun scraps--numbered (prefix action)
   "Entries 1 to 9 of menu PREFIX, one per scrap, calling ACTION with its number."

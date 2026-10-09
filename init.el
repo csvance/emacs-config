@@ -308,8 +308,12 @@ before the buffer does, which cuts off its last letter when no newline follows."
                                            swapped t)))
                        swapped))
               (my/treemacs-light)))
-        (setf (treemacs-workspace->projects workspace)
-              (sort (copy-sequence (treemacs-workspace->projects workspace)) before)))
+        ;; Reorder the list's own cells: init.el is read before Treemacs loads, so
+        ;; a `setf' of the accessor would expand into a call to no function
+        (let ((projects (treemacs-workspace->projects workspace)))
+          (cl-loop for cell on projects
+                   for project in (sort (copy-sequence projects) before)
+                   do (setcar cell project))))
       (treemacs--persist)))
   (add-hook 'treemacs-create-project-functions #'my/treemacs-sort)
   (defun my/treemacs-light ()

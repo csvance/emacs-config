@@ -595,7 +595,9 @@ WORKSPACES is the parsed `workspace list'."
   "Status of the campfire agents, grouped by project."
   (setq-local truncate-lines t)
   (setq-local cursor-type nil)
-  (setq-local mode-line-format nil))
+  (setq-local mode-line-format nil)
+  ;; A bar across the top of the pane, marking where Treemacs above it ends
+  (setq-local header-line-format (propertize " Agents" 'face '(:inherit header-line :weight bold))))
 
 (defun agents-pane-visit (&optional event)
   "Visit the agent on this line (or where EVENT clicked)."
@@ -625,7 +627,6 @@ WORKSPACES is the parsed `workspace list'."
             (key (get-text-property (point) 'agents-key))
             (project nil))
         (erase-buffer)
-        (insert (propertize "Agents" 'face 'bold) "\n")
         (maphash (lambda (host err)
                    (insert (propertize (format "%s: %s\n" host (car (split-string err "\n")))
                                        'face 'error)))

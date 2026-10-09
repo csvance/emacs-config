@@ -21,6 +21,11 @@
   "Height of the sessions pane in the sidebar, as a fraction of the frame."
   :type 'number)
 
+(defcustom sessions-hosts nil
+  "SSH destinations `sessions-new' offers first, such as \"user@host\".
+Sessions opened to them are listed only while they run."
+  :type '(repeat string))
+
 (defvar sessions--adhoc nil
   "Sessions started with `sessions-new', newest first.
 Plists like the entries of `my/vterm-sessions'.")
@@ -83,7 +88,8 @@ Plists like the entries of `my/vterm-sessions'.")
 (defun sessions--read-destination ()
   "Read an SSH destination, offering the ones this config already uses."
   (completing-read "SSH to: "
-                   (delete-dups (delq nil (append (mapcar #'sessions--destination (sessions--entries))
+                   (delete-dups (delq nil (append sessions-hosts
+                                                  (mapcar #'sessions--destination (sessions--entries))
                                                   (mapcar (lambda (h) (plist-get h :ssh))
                                                           (bound-and-true-p agents-hosts)))))
                    nil nil nil 'sessions--host-history))

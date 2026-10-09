@@ -123,7 +123,7 @@
                   (not (or (memq b except)
                            (layouts--agent-buffer-p b)
                            (string-prefix-p " " (buffer-name b))
-                           (equal (buffer-name b) "*agents*"))))
+                           (member (buffer-name b) '("*agents*" "*sessions*")))))
                 (buffer-list))
       (get-scratch-buffer-create)))
 

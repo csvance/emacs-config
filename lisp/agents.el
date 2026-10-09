@@ -667,18 +667,19 @@ WORKSPACES is the parsed `workspace list'."
     (set-window-dedicated-p win t)
     win))
 
+(defvar agents-sidebar-panes nil
+  "Functions that show more panes below the status pane when the sidebar opens.")
+
 (defun agents-sidebar-toggle ()
-  "Show or hide the sidebar: Treemacs, with the status pane below it."
+  "Show or hide the sidebar: Treemacs, the status pane, and `agents-sidebar-panes'."
   (interactive)
   (require 'treemacs)
-  (let ((pane (get-buffer-window agents--pane-name)))
-    (if (or pane (eq (treemacs-current-visibility) 'visible))
-        (progn
-          (when pane (delete-window pane))
-          (when (eq (treemacs-current-visibility) 'visible)
-            (delete-window (treemacs-get-local-window))))
-      (save-selected-window (treemacs))
-      (when agents-hosts (agents-pane-show)))))
+  (if-let* ((side (seq-filter (lambda (w) (eq (window-parameter w 'window-side) 'left))
+                              (window-list nil 'nomini))))
+      (mapc #'delete-window side)
+    (save-selected-window (treemacs))
+    (when agents-hosts (agents-pane-show))
+    (run-hooks 'agents-sidebar-panes)))
 
 ;;;; F2 menu
 

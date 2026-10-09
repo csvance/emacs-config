@@ -32,7 +32,7 @@
 Each has :name (buffer *NAME*), :title (label in the F1 menu), :command, and
 optionally :key (a global key) and :menu (its key in the F1 menu).  Opening a
 session switches to its buffer if open, else starts COMMAND in a new terminal.
-When COMMAND exits, the buffer closes.")
+When COMMAND exits, the buffer closes.  The sidebar lists them (lisp/sessions.el).")
 (load (locate-user-emacs-file "local.el") 'noerror)
 
 ;; API keys live in secrets/authinfo (ignored by Git, mode 600), not ~/.authinfo:
@@ -357,21 +357,10 @@ Return the project that covers ROOT."
                                    (delq nil (mapcar (lambda (s) (plist-get s :key))
                                                      my/vterm-sessions))))
   :init
-  (defun my/vterm-session (name command)
-    "Switch to terminal *NAME* running COMMAND, starting it if needed.
-From inside that terminal, go back to the previous buffer."
-    (let ((buf (format "*%s*" name)))
-      (cond ((equal (buffer-name) buf) (switch-to-buffer (other-buffer (current-buffer) t)))
-            ((get-buffer buf) (switch-to-buffer buf))
-            (t (require 'vterm)
-               (defvar vterm-shell)         ; bind vterm's option, not a local variable
-               (let ((vterm-shell command)
-                     (default-directory (expand-file-name "~/")))
-                 (vterm buf))))))
   (defun my/vterm-session-command (session)
-    "Return a command that opens SESSION, a plist from `my/vterm-sessions'."
-    (lambda () (interactive)
-      (my/vterm-session (plist-get session :name) (plist-get session :command))))
+    "Return a command that opens SESSION, a plist from `my/vterm-sessions'.
+From inside that session's terminal, it goes back to the previous buffer."
+    (lambda () (interactive) (sessions-toggle session)))
   (dolist (session my/vterm-sessions)
     (when-let* ((key (plist-get session :key)))
       (global-set-key (kbd key) (my/vterm-session-command session))))
@@ -452,6 +441,12 @@ With prefix argument NEW, always open another terminal."
          ("<f8>" . agents-sidebar-toggle))
   :config
   (agents-start))
+
+;;;; Sessions: terminals such as SSH ones, listed in the sidebar below the agents (lisp/sessions.el)
+(use-package sessions
+  :ensure nil                         ; persistent ones are `my/vterm-sessions', in local.el
+  :demand t                           ; before the sidebar first opens
+  :after agents)
 
 ;;;; Layouts: F3 arranges the editing area, optionally over a tile for agents (lisp/layouts.el)
 (use-package layouts
@@ -541,6 +536,7 @@ With prefix argument NEW, always open another terminal."
      ["Terminal"
       ("t" "Project terminal" my/project-vterm)
       ("T" "New project terminal" (lambda () (interactive) (my/project-vterm t)))
+      ("S" "New SSH session" sessions-new)
       ("M" "Toggle mouse forwarding" tui-mouse-mode
        :if (lambda () (derived-mode-p 'vterm-mode)))]]
     [["Buffers"

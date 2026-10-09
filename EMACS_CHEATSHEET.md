@@ -14,7 +14,7 @@ Files save themselves after 5 idle seconds, and a file changed on disk (by an ag
 | `F4` | Notes: start, find or search notes in `~/Notes` (see below) |
 | `F5` | Blog: start, find, preview and render Quarto posts in `~/Git/csvance.github.io` (see below) |
 | `F7` | Mode toggle: Markdown rendered view (read-only, tables drawn as grids) or editing; inline type hints in language server buffers |
-| `F8` | Toggle the sidebar: Treemacs, with the agents pane below it |
+| `F8` | Toggle the sidebar: Treemacs, with the agents and sessions panes below it |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |
 | `F12` | Open the project's terminal, or return to the previous buffer |
@@ -64,7 +64,7 @@ A Magit-style menu of custom commands. Press `F1` (or `C-c m`), then the letter 
 |---|---|
 | Sessions | One letter per persistent terminal session in `my/vterm-sessions` (set in `local.el` with a `:menu` key) |
 | `b` / `B` | Switch buffer (with preview) / buffer list grouped by project |
-| `t` / `T` / `M` | Project terminal / new project terminal / toggle mouse forwarding (in a terminal) |
+| `t` / `T` / `S` / `M` | Project terminal / new project terminal / new SSH session / toggle mouse forwarding (in a terminal) |
 | `p` / `f` / `g` | Switch project / find file in project / Magit status |
 | `s` / `i` / `c` | Toggle sidebar (as `F8`) / toggle type hints (language server buffers) / cheat sheet |
 | `r` / `R` | revise-sync watcher status / restart |
@@ -98,6 +98,15 @@ A full terminal emulator, good for SSH and TUI programs such as coding agents. K
 | Mouse wheel | When the program does not take the mouse, scrolling up freezes the terminal (mode line shows `VTermCopy`) so redraws stop pulling the view down; scroll back to the bottom or start typing to resume live output |
 | `F1 M` | Turn mouse forwarding off in this terminal (or back on), for example to select a TUI's text with the Emacs mouse |
 | `Ctrl`+click | Open the URL under the pointer in the browser, even one a program wrapped onto several lines; works whether or not the program has the mouse |
+
+## Sessions
+
+The sessions pane, below the agents pane, lists terminal sessions by host: the persistent ones in `local.el`'s `my/vterm-sessions`, `●` running or `○` not started, and SSH sessions opened with `F1 S`, which stay listed while they run. A session's buffer is `*NAME*` (`*ssh: HOST*` for one opened with `F1 S`), and it closes when the command exits.
+
+| Key | Action |
+|---|---|
+| `F1 S` | Open an SSH session in a new terminal, offering the hosts this config already uses (`C-u F1 S` also asks for a remote directory to start in) |
+| Sessions pane | `RET` or a click visits the session on that line, starting it if it is not running; `n` opens an SSH session, `k` closes one, `g` redraws |
 
 ## Agents (F2)
 

@@ -12,6 +12,7 @@ auto-save-list/
 backups/
 .cache/
 transient/
+scraps/
 eshell/
 url/
 tramp

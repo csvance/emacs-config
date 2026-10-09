@@ -13,6 +13,7 @@ Files save themselves after 5 idle seconds, and a file changed on disk (by an ag
 | `F3` | Layouts: one window, one over an agent, or an editor and Magit over an agent (see below) |
 | `F4` | Notes: start, find or search notes in `~/Notes` (see below) |
 | `F5` | Blog: start, find, preview and render Quarto posts in `~/Git/csvance.github.io` (see below) |
+| `F6` | Scraps: short-lived blocks of text, as tabs (see below) |
 | `F7` | Mode toggle: Markdown rendered view (read-only, tables drawn as grids) or editing; inline type hints in language server buffers |
 | `F8` | Toggle the sidebar: Treemacs, with the agents and sessions panes below it. Drag the Agents or Sessions bar to resize the panes |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
@@ -82,7 +83,7 @@ Every prompt (`C-x b`, `M-x`, find file, switch project) shows a vertical list y
 
 ## Terminal (vterm)
 
-A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F2`, `F3`, `F4`, `F8`, `F9` and `F12` prefixes and any session keys.
+A full terminal emulator, good for SSH and TUI programs such as coding agents. Keys go to the program running in it, except the `C-c`, `C-x`, `M-x`, `F1`, `F2`, `F3`, `F4`, `F6`, `F8`, `F9` and `F12` prefixes and any session keys.
 
 | Key | Action |
 |---|---|
@@ -107,6 +108,22 @@ The sessions pane, below the agents pane, lists terminal sessions by host: the p
 |---|---|
 | `F1 S` | Open an SSH session in a new terminal, offering `local.el`'s `sessions-hosts` first, then the hosts this config already uses (`C-u F1 S` also asks for a remote directory to start in). It runs the shell `sessions-shells` in `local.el` names for that host, else the login shell |
 | Sessions pane | `RET` or a click visits the session on that line, starting it if it is not running; `n` opens an SSH session, `k` closes one, `t` retitles an `F1 S` session from what it shows now, `g` redraws |
+
+## Scraps (F6)
+
+Blocks of text to keep at hand for a while: a command, a path, a reply to copy back out. Each scrap is a buffer, saved as you type to `~/.emacs.d/scraps/`, so scraps survive a restart until you close them. A tab line across the top of a scrap's window lists them all, numbered. The local model titles a scrap from its text, the first time you leave it (or at once, for one made from a copy); until then its tab shows its first line.
+
+| Key | Action |
+|---|---|
+| `F6 y` | New scrap holding the latest copy: anything killed in Emacs, or copied by another program, such as a TUI that copies on select |
+| `F6 n` | New empty scrap (or `+` on the tab line) |
+| `F6 1`...`9` | Visit that scrap (or click its tab) |
+| `F6 c` / `F6 a` | Copy all of this scrap / append the latest copy to it |
+| `F6 t` | Retitle this scrap from its text now |
+| `F6 k`, `C-x k`, or a tab's `x` | Close this scrap: no question asked, and the next scrap takes its place |
+| `F6 K` | Close all scraps, after one confirmation |
+
+Closed scraps' files go to the trash (`~/.local/share/Trash`), so a scrap closed by mistake can be restored from there.
 
 ## Agents (F2)
 

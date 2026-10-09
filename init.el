@@ -404,7 +404,7 @@ before the buffer does, which cuts off its last letter when no newline follows."
   (vterm-enable-manipulate-selection-data-by-osc52 t)
   ;; Keep these for Emacs instead of sending them to the terminal program
   (vterm-keymap-exceptions (append '("C-c" "C-x" "C-u" "C-g" "C-h" "C-l" "M-x" "M-o" "C-y" "M-y"
-                                     "<f1>" "<f2>" "<f3>" "<f4>" "<f8>" "<f9>" "<f12>")
+                                     "<f1>" "<f2>" "<f3>" "<f4>" "<f6>" "<f8>" "<f9>" "<f12>")
                                    (delq nil (mapcar (lambda (s) (plist-get s :key))
                                                      my/vterm-sessions))))
   :init
@@ -512,6 +512,12 @@ With prefix argument NEW, always open another terminal."
   :ensure nil
   :demand t                           ; its find-file hook covers notes opened any way
   :bind ("<f4>" . notes-menu))
+
+;;;; Scraps: F6.  Short-lived blocks of text as tabs, kept until closed (lisp/scraps.el)
+(use-package scraps
+  :ensure nil
+  :demand t                           ; scraps reopened after a restart need its hooks
+  :bind ("<f6>" . scraps-menu))
 
 ;;;; Blog: F5.  Quarto posts in ~/Git/csvance.github.io (lisp/blog.el)
 (use-package blog

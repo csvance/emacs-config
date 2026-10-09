@@ -159,7 +159,9 @@ With RUNNING non-nil, offer only the running ones."
   "Terminal sessions, grouped by host."
   (setq-local truncate-lines t)
   (setq-local cursor-type nil)
-  (setq-local mode-line-format nil))
+  (setq-local mode-line-format nil)
+  ;; A bar across the top of the pane, marking where the agents pane above it ends
+  (setq-local header-line-format (propertize " Sessions" 'face '(:inherit header-line :weight bold))))
 
 (defun sessions-pane-visit (&optional event)
   "Visit the session on this line (or where EVENT clicked), starting it if needed."
@@ -190,7 +192,6 @@ With RUNNING non-nil, offer only the running ones."
             (here (get-text-property (point) 'sessions-session))
             (hosts nil))
         (erase-buffer)
-        (insert (propertize "Sessions" 'face 'bold) "\n")
         (dolist (s (sessions--entries))
           (cl-pushnew (sessions--host s) hosts :test #'equal))
         (unless hosts

@@ -216,7 +216,11 @@ shows only a login banner and a prompt, with nothing done yet, reply with an emp
 (defun sessions--apply-title (session title)
   "Show SESSION as TITLE, in the pane and in its buffer's name."
   (let ((buf (sessions--buffer session))
-        (name (sessions--free-name (format "ssh: %s: %s" (plist-get session :dest) title))))
+        (name (sessions--free-name (format "ssh: %s: %s"
+                                            ;; Sessions opened before titling existed have no :dest
+                                            (or (plist-get session :dest)
+                                                (sessions--destination session))
+                                            title))))
     (when buf
       (with-current-buffer buf (rename-buffer (format "*%s*" name))))
     (plist-put session :name name)

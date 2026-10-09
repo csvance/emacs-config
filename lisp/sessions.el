@@ -3,7 +3,8 @@
 ;; Each session is a vterm buffer `*NAME*' running one command, usually SSH.  Two kinds:
 ;; the persistent ones in `my/vterm-sessions' (local.el), listed whether or not they are
 ;; running, and ones started on the spot with `sessions-new', listed while they run.
-;; A pane in the sidebar, below the agents pane, lists them all by host.
+;; A pane in the sidebar, below the agents pane, lists them all by host.  The first time you
+;; leave an ad-hoc session, the local model (lisp/local-llm.el) titles it from what it shows.
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -12,6 +13,8 @@
 (defvar vterm-shell)                    ; bound around `vterm', which is loaded on demand
 (defvar my/vterm-sessions)              ; init.el, set in local.el
 (declare-function vterm "vterm")
+(declare-function local-llm-available-p "local-llm")
+(declare-function local-llm-request "local-llm")
 
 (defgroup sessions nil
   "Terminal sessions, listed below the agents pane."
@@ -32,6 +35,14 @@ HOST is a host name without the user, such as \"netai01\"; it also matches
 that host's full name, such as netai01.medicalmetrics.local.  On other hosts,
 and on a host where SHELL is missing, the session runs the login shell."
   :type '(alist :key-type string :value-type string))
+
+(defcustom sessions-auto-title t
+  "Whether to title an ad-hoc session with the local model when you first leave it."
+  :type 'boolean)
+
+(defcustom sessions-title-context 6000
+  "Characters from the end of a session's terminal that the model sees."
+  :type 'integer)
 
 (defvar sessions--adhoc nil
   "Sessions started with `sessions-new', newest first.
@@ -127,6 +138,12 @@ Nil when there is neither, so ssh starts the login shell itself."
                           (shell-quote-argument shell) (shell-quote-argument shell))
                 "exec $SHELL -l")))))
 
+(defun sessions--free-name (name)
+  "NAME, or NAME <N> for the first N whose buffer *NAME <N>* does not exist."
+  (cl-loop for n from 1
+           for candidate = (if (= n 1) name (format "%s <%d>" name n))
+           unless (get-buffer (format "*%s*" candidate)) return candidate))
+
 (defun sessions-new (dest &optional dir)
   "Open an SSH session to DEST in a new terminal, listed in the sessions pane.
 With a prefix argument, also read a remote directory DIR to start in."
@@ -138,10 +155,8 @@ With a prefix argument, also read a remote directory DIR to start in."
          (command (concat "ssh -t " (shell-quote-argument dest)
                           (when remote (concat " " (shell-quote-argument remote)))))
          (label (if dir (format "%s:%s" dest dir) dest))
-         (name (cl-loop for n from 1
-                        for name = (if (= n 1) (concat "ssh: " label) (format "ssh: %s <%d>" label n))
-                        unless (get-buffer (format "*%s*" name)) return name))
-         (session (list :name name :title label :command command)))
+         (session (list :name (sessions--free-name (concat "ssh: " label))
+                        :title label :command command :dest dest :titled nil :pending nil)))
     (push session sessions--adhoc)
     (when (window-parameter nil 'window-side)
       (when-let* ((win (get-mru-window nil nil nil t))) (select-window win)))
@@ -173,6 +188,82 @@ With RUNNING non-nil, offer only the running ones."
       (let ((kill-buffer-query-functions nil)) ; already confirmed
         (kill-buffer buf)))))
 
+;;;; Titles: the local model names an ad-hoc session the first time you leave it
+
+(defconst sessions--title-schema
+  '(:type "object"
+    :properties (:title (:type "string" :maxLength 40))
+    :required ["title"]
+    :additionalProperties :json-false)
+  "Shape of the model's reply.")
+
+(defconst sessions--title-prompt
+  "You title terminal sessions. Given the recent contents of an SSH terminal, reply
+with a title of two to five words that says what the session is being used for, such
+as \"Bazel test run\" or \"GPU usage watch\". Leave out the host name. If the terminal
+shows only a login banner and a prompt, with nothing done yet, reply with an empty title."
+  "Instructions for the model.")
+
+(defun sessions--terminal-text (buffer)
+  "The last `sessions-title-context' characters of BUFFER, without blank lines."
+  (with-current-buffer buffer
+    (let ((text (buffer-substring-no-properties
+                 (max (point-min) (- (point-max) sessions-title-context)) (point-max))))
+      (string-join (seq-remove (lambda (l) (string-blank-p l))
+                               (mapcar #'string-trim-right (split-string text "\n")))
+                   "\n"))))
+
+(defun sessions--apply-title (session title)
+  "Show SESSION as TITLE, in the pane and in its buffer's name."
+  (let ((buf (sessions--buffer session))
+        (name (sessions--free-name (format "ssh: %s: %s" (plist-get session :dest) title))))
+    (when buf
+      (with-current-buffer buf (rename-buffer (format "*%s*" name))))
+    (plist-put session :name name)
+    (plist-put session :title title)
+    (plist-put session :titled t)
+    (sessions--schedule-redraw)))
+
+(defun sessions-title (session)
+  "Ask the local model to title SESSION from what its terminal shows.
+The request runs in the background.  Only ad-hoc sessions are titled."
+  (interactive (list (seq-find (lambda (s) (or (eq (sessions--buffer s) (current-buffer))
+                                                (eq s (get-text-property (point) 'sessions-session))))
+                               sessions--adhoc)))
+  (unless session (user-error "Not an ad-hoc session"))
+  (let ((buf (sessions--buffer session)))
+    (when (and buf (not (plist-get session :pending))
+               (require 'local-llm nil t) (local-llm-available-p))
+      (plist-put session :pending t)
+      (local-llm-request
+       (format "Host: %s\n\n%s" (sessions--host session) (sessions--terminal-text buf))
+       sessions--title-prompt sessions--title-schema
+       (lambda (data problem)
+         (plist-put session :pending nil)
+         (let ((title (string-trim (or (plist-get data :title) ""))))
+           (cond (problem (message "Could not title the session: %s" problem))
+                 ;; Nothing done in it yet: try again the next time you leave it
+                 ((string-empty-p title))
+                 ((sessions--buffer session) (sessions--apply-title session title)))))))))
+
+(defvar sessions--current nil
+  "The buffer of the selected window, as of the last window change.")
+
+(defun sessions--note-leaving (&rest _)
+  "Title the ad-hoc session you just left, if it has no title yet."
+  (let ((buf (window-buffer (selected-window))))
+    (unless (or (eq buf sessions--current) (minibufferp buf))
+      (when-let* ((sessions-auto-title)
+                  (left sessions--current)
+                  ((buffer-live-p left))
+                  (session (seq-find (lambda (s) (eq (sessions--buffer s) left)) sessions--adhoc))
+                  ((not (plist-get session :titled))))
+        (sessions-title session))
+      (setq sessions--current buf))))
+
+(add-hook 'window-selection-change-functions #'sessions--note-leaving)
+(add-hook 'window-buffer-change-functions #'sessions--note-leaving)
+
 ;;;; Pane
 
 (defconst sessions--pane-name "*sessions*")
@@ -183,6 +274,7 @@ With RUNNING non-nil, offer only the running ones."
   "<mouse-1>" #'sessions-pane-visit
   "n" #'sessions-new
   "k" #'sessions-close
+  "t" #'sessions-title
   "g" #'sessions--redraw)
 
 (define-derived-mode sessions-pane-mode special-mode "Sessions"

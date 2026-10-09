@@ -101,12 +101,12 @@ A full terminal emulator, good for SSH and TUI programs such as coding agents. K
 
 ## Sessions
 
-The sessions pane, below the agents pane, lists terminal sessions by host: the persistent ones in `local.el`'s `my/vterm-sessions`, `●` running or `○` not started, and SSH sessions opened with `F1 S`, which stay listed while they run. A session's buffer is `*NAME*` (`*ssh: HOST*` for one opened with `F1 S`), and it closes when the command exits.
+The sessions pane, below the agents pane, lists terminal sessions by host: the persistent ones in `local.el`'s `my/vterm-sessions`, `●` running or `○` not started, and SSH sessions opened with `F1 S`, which stay listed while they run. The first time you switch away from one of those, the local model titles it from what its terminal shows (such as "Bazel test run"), in the pane and in its buffer name; a session showing only a login banner is titled the next time instead. A session's buffer is `*NAME*` (`*ssh: HOST*` for one opened with `F1 S`), and it closes when the command exits.
 
 | Key | Action |
 |---|---|
 | `F1 S` | Open an SSH session in a new terminal, offering `local.el`'s `sessions-hosts` first, then the hosts this config already uses (`C-u F1 S` also asks for a remote directory to start in). It runs the shell `sessions-shells` in `local.el` names for that host, else the login shell |
-| Sessions pane | `RET` or a click visits the session on that line, starting it if it is not running; `n` opens an SSH session, `k` closes one, `g` redraws |
+| Sessions pane | `RET` or a click visits the session on that line, starting it if it is not running; `n` opens an SSH session, `k` closes one, `t` retitles an `F1 S` session from what it shows now, `g` redraws |
 
 ## Agents (F2)
 

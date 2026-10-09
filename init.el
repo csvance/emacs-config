@@ -268,6 +268,49 @@ Return the project that covers ROOT."
              (cadr (treemacs-do-add-project-to-workspace
                     path (format "%s (%s)" name (treemacs--filename (file-name-directory path))))))
             (`(success ,project) project)))))
+  (defun my/treemacs-project-bounds (project)
+    "Start and end of PROJECT's lines in the sidebar, without blank lines around.
+`treemacs--get-bounds-of-project' takes the last project to end one character
+before the buffer does, which cuts off its last letter when no newline follows."
+    (save-excursion
+      (goto-char (treemacs-project->position project))
+      (let ((start (line-beginning-position))
+            (next (treemacs--next-non-child-button (point))))
+        (goto-char (if next
+                       (progn (goto-char (treemacs-button-start next)) (line-beginning-position))
+                     (treemacs--projects-end)))
+        (skip-chars-backward " \t\n")
+        (cons start (point)))))
+  (defun my/treemacs-sort (&rest _)
+    "Order the sidebar's projects by name, ignoring case."
+    (let* ((workspace (treemacs-current-workspace))
+           (before (lambda (a b) (string< (downcase (treemacs-project->name a))
+                                          (downcase (treemacs-project->name b))))))
+      (if-let* ((buf (treemacs-get-local-buffer)))
+          ;; Swap neighbors in place, as `treemacs-move-project-up' does, so
+          ;; each project keeps its open folders
+          (with-current-buffer buf
+            (let ((projects (treemacs-workspace->projects workspace))
+                  (inhibit-read-only t)
+                  swapped)
+              (while (progn
+                       (setq swapped nil)
+                       (cl-loop for i from 0 below (1- (length projects))
+                                for a = (nth i projects)
+                                for b = (nth (1+ i) projects)
+                                when (funcall before b a)
+                                do (let ((ba (my/treemacs-project-bounds a))
+                                         (bb (my/treemacs-project-bounds b)))
+                                     (transpose-regions (car ba) (cdr ba) (car bb) (cdr bb))
+                                     (setf (nth i projects) b
+                                           (nth (1+ i) projects) a
+                                           swapped t)))
+                       swapped))
+              (my/treemacs-light)))
+        (setf (treemacs-workspace->projects workspace)
+              (sort (copy-sequence (treemacs-workspace->projects workspace)) before)))
+      (treemacs--persist)))
+  (add-hook 'treemacs-create-project-functions #'my/treemacs-sort)
   (defun my/treemacs-light ()
     "Light the active project's name in the sidebar."
     (when-let* ((buf (treemacs-get-local-buffer)))
@@ -329,7 +372,8 @@ Return the project that covers ROOT."
   (treemacs--maybe-load-workspaces)
   (dolist (dir my/projects)
     (when (file-directory-p dir)
-      (my/treemacs-add dir))))
+      (my/treemacs-add dir)))
+  (my/treemacs-sort))                   ; in case the saved order is not sorted
 
 (use-package treemacs-nerd-icons
   :after treemacs

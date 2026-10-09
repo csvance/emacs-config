@@ -14,7 +14,7 @@ Files save themselves after 5 idle seconds, and a file changed on disk (by an ag
 | `F4` | Notes: start, find or search notes in `~/Notes` (see below) |
 | `F5` | Blog: start, find, preview and render Quarto posts in `~/Git/csvance.github.io` (see below) |
 | `F7` | Mode toggle: Markdown rendered view (read-only, tables drawn as grids) or editing; inline type hints in language server buffers |
-| `F8` | Toggle the sidebar: Treemacs, with the agents and sessions panes below it |
+| `F8` | Toggle the sidebar: Treemacs, with the agents and sessions panes below it. Drag the Agents or Sessions bar to resize the panes |
 | `F9` | Open this cheat sheet, or return to the previous buffer |
 | `F10` | Open the menus (the menu bar is hidden) |
 | `F12` | Open the project's terminal, or return to the previous buffer |

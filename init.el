@@ -496,11 +496,6 @@ With prefix argument NEW, always open another terminal."
       (set-fontset-font t range family nil 'prepend))))
 (my/symbol-fallback-font "JuliaMono")
 (column-number-mode 1)
-;; A thin line along each window's bottom edge, to drag for resizing.  The sidebar
-;; panes have no mode line to drag, and their header lines did not take the drag.
-(setq window-divider-default-places 'bottom-only
-      window-divider-default-bottom-width 3)
-(window-divider-mode 1)
 (setq custom-file (locate-user-emacs-file "custom.el"))
 (load custom-file 'noerror)           ; keep Customize output out of init.el
 

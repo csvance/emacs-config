@@ -7,11 +7,10 @@
 
 (require 'cl-lib)
 (require 'subr-x)
+(require 'agents)                       ; the sidebar this pane joins
 
 (defvar vterm-shell)                    ; bound around `vterm', which is loaded on demand
 (defvar my/vterm-sessions)              ; init.el, set in local.el
-(defvar agents-hosts)
-(defvar agents-sidebar-panes)
 (declare-function vterm "vterm")
 
 (defgroup sessions nil
@@ -161,7 +160,7 @@ With RUNNING non-nil, offer only the running ones."
   (setq-local cursor-type nil)
   (setq-local mode-line-format nil)
   ;; A bar across the top of the pane, marking where the agents pane above it ends
-  (setq-local header-line-format (propertize " Sessions" 'face '(:inherit header-line :weight bold))))
+  (setq-local header-line-format (agents-sidebar-bar "Sessions")))
 
 (defun sessions-pane-visit (&optional event)
   "Visit the session on this line (or where EVENT clicked), starting it if needed."
@@ -238,8 +237,7 @@ With RUNNING non-nil, offer only the running ones."
   "Show the pane with the sidebar, when there are sessions to list."
   (when (sessions--entries) (sessions-pane-show)))
 
-(with-eval-after-load 'agents
-  (add-hook 'agents-sidebar-panes #'sessions--sidebar-pane))
+(add-hook 'agents-sidebar-panes #'sessions--sidebar-pane)
 
 (provide 'sessions)
 ;;; sessions.el ends here

@@ -578,6 +578,41 @@ WORKSPACES is the parsed `workspace list'."
                (run-with-timer 1 nil #'agents--await host pane deadline))
               (t (message "Could not start agent: herdr did not detect one in %s" pane))))))))
 
+;;;; Sidebar bars: a pane's title bar is also the handle that resizes the window above it
+
+(defun agents-sidebar-drag-bar (event)
+  "Move the edge above the bar pressed in EVENT along with the mouse."
+  (interactive "e")
+  (when-let* ((win (posn-window (event-start event)))
+              ((window-live-p win))
+              (above (window-in-direction 'above win t)))
+    (let* ((bottom (lambda () (+ (window-pixel-top above) (window-pixel-height above))))
+           ;; Keep the edge as far from the pointer as when the drag began
+           (offset (- (cddr (mouse-pixel-position)) (funcall bottom)))
+           ev)
+      (track-mouse
+        (setq track-mouse 'dragging)    ; keep the resize pointer while dragging
+        (while (mouse-movement-p (setq ev (read-event)))
+          (when-let* ((y (cddr (mouse-pixel-position))))
+            (ignore-errors
+              (adjust-window-trailing-edge above (- y offset (funcall bottom)) nil t)))))
+      ;; The release ends the drag; anything else is meant for Emacs
+      (unless (eq (event-basic-type ev) 'mouse-1)
+        (push ev unread-command-events)))))
+
+(defvar agents--bar-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line down-mouse-1] #'agents-sidebar-drag-bar)
+    (define-key map [header-line mouse-1] #'ignore)
+    map)
+  "Keymap of a sidebar pane's title bar.")
+
+(defun agents-sidebar-bar (title)
+  "A `header-line-format' showing TITLE, which drags to resize the pane."
+  (propertize (concat " " title) 'face '(:inherit header-line :weight bold)
+              'keymap agents--bar-map 'pointer 'vdrag
+              'help-echo "Drag to resize"))
+
 ;;;; Status pane
 
 (defconst agents--pane-name "*agents*")
@@ -597,7 +632,7 @@ WORKSPACES is the parsed `workspace list'."
   (setq-local cursor-type nil)
   (setq-local mode-line-format nil)
   ;; A bar across the top of the pane, marking where Treemacs above it ends
-  (setq-local header-line-format (propertize " Agents" 'face '(:inherit header-line :weight bold))))
+  (setq-local header-line-format (agents-sidebar-bar "Agents")))
 
 (defun agents-pane-visit (&optional event)
   "Visit the agent on this line (or where EVENT clicked)."

@@ -26,6 +26,13 @@
 Sessions opened to them are listed only while they run."
   :type '(repeat string))
 
+(defcustom sessions-shells nil
+  "Shell `sessions-new' starts on each host, as an alist of (HOST . SHELL).
+HOST is a host name without the user, such as \"netai01\"; it also matches
+that host's full name, such as netai01.medicalmetrics.local.  On other hosts,
+and on a host where SHELL is missing, the session runs the login shell."
+  :type '(alist :key-type string :value-type string))
+
 (defvar sessions--adhoc nil
   "Sessions started with `sessions-new', newest first.
 Plists like the entries of `my/vterm-sessions'.")
@@ -100,6 +107,26 @@ Plists like the entries of `my/vterm-sessions'.")
       (concat "~/" (shell-quote-argument (substring dir 2)))
     (shell-quote-argument dir)))
 
+(defun sessions--shell (dest)
+  "The shell `sessions-shells' names for DEST's host, or nil."
+  (let ((host (car (last (split-string dest "@")))))
+    (cdr (seq-find (lambda (entry)
+                     (or (equal host (car entry))
+                         (string-prefix-p (concat (car entry) ".") host)))
+                   sessions-shells))))
+
+(defun sessions--remote-command (dest dir)
+  "What the remote side runs for DEST: cd to DIR, then DEST's shell.
+Nil when there is neither, so ssh starts the login shell itself."
+  (let ((shell (sessions--shell dest)))
+    (when (or dir shell)
+      (concat (when dir (format "cd %s && " (sessions--remote-dir dir)))
+              (if shell
+                  ;; Fall back to the login shell where SHELL is not installed
+                  (format "if command -v %s >/dev/null; then exec %s -l; else exec $SHELL -l; fi"
+                          (shell-quote-argument shell) (shell-quote-argument shell))
+                "exec $SHELL -l")))))
+
 (defun sessions-new (dest &optional dir)
   "Open an SSH session to DEST in a new terminal, listed in the sessions pane.
 With a prefix argument, also read a remote directory DIR to start in."
@@ -107,11 +134,9 @@ With a prefix argument, also read a remote directory DIR to start in."
                  (list dest (when current-prefix-arg (read-string (format "Directory on %s: " dest))))))
   (when (string-empty-p (string-trim dest)) (user-error "No destination"))
   (let* ((dir (and dir (not (string-empty-p dir)) dir))
+         (remote (sessions--remote-command dest dir))
          (command (concat "ssh -t " (shell-quote-argument dest)
-                          (when dir
-                            (concat " " (shell-quote-argument
-                                         (format "cd %s && exec $SHELL -l"
-                                                 (sessions--remote-dir dir)))))))
+                          (when remote (concat " " (shell-quote-argument remote)))))
          (label (if dir (format "%s:%s" dest dir) dest))
          (name (cl-loop for n from 1
                         for name = (if (= n 1) (concat "ssh: " label) (format "ssh: %s <%d>" label n))

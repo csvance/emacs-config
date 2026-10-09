@@ -105,7 +105,7 @@ The sessions pane, below the agents pane, lists terminal sessions by host: the p
 
 | Key | Action |
 |---|---|
-| `F1 S` | Open an SSH session in a new terminal, offering `local.el`'s `sessions-hosts` first, then the hosts this config already uses (`C-u F1 S` also asks for a remote directory to start in) |
+| `F1 S` | Open an SSH session in a new terminal, offering `local.el`'s `sessions-hosts` first, then the hosts this config already uses (`C-u F1 S` also asks for a remote directory to start in). It runs the shell `sessions-shells` in `local.el` names for that host, else the login shell |
 | Sessions pane | `RET` or a click visits the session on that line, starting it if it is not running; `n` opens an SSH session, `k` closes one, `g` redraws |
 
 ## Agents (F2)

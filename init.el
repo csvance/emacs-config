@@ -26,6 +26,7 @@
 ;;           (:name "remote-shell" :title "Remote shell in a directory" :menu "s"
 ;;            :command "ssh -t user@host 'cd ~/some/dir && exec $SHELL -l'")))
 ;;   (setq sessions-hosts '("user@other-host"))  ; offered first by F1 S
+;;   (setq sessions-shells '(("other-host" . "zsh")))  ; shell F1 S starts there
 (defvar my/projects nil
   "Project roots registered with project.el at startup.  Set in local.el.")
 (defvar my/vterm-sessions nil

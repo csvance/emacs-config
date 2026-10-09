@@ -118,7 +118,8 @@ Blocks of text to keep at hand for a while: a command, a path, a reply to copy b
 | `F6 y` | New scrap holding the latest copy: anything killed in Emacs, or copied by another program, such as a TUI that copies on select |
 | `F6 n` | New empty scrap (or `+` on the tab line) |
 | `F6 1`...`9` | Visit that scrap (or click its tab) |
-| `F6 c` / `F6 a` | Copy all of this scrap / append the latest copy to it |
+| `F6 c 1`...`9` | Copy that scrap whole, from anywhere, without visiting it (`F6 c c` in a scrap copies that one) |
+| `F6 a` | Append the latest copy to this scrap |
 | `F6 t` | Retitle this scrap from its text now |
 | `F6 k`, `C-x k`, or a tab's `x` | Close this scrap: no question asked, and the next scrap takes its place |
 | `F6 K` | Close all scraps, after one confirmation |

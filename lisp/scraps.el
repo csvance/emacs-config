@@ -185,12 +185,18 @@ That includes text another program copied, such as a TUI that copies on select."
       (when-let* ((win (get-mru-window nil nil nil t))) (select-window win)))
     (switch-to-buffer buf)))
 
-(defun scraps-copy ()
-  "Copy this scrap's whole text, to paste elsewhere."
+(defun scraps-copy (&optional buffer)
+  "Copy BUFFER's scrap (this one, interactively) whole, to paste elsewhere."
   (interactive)
-  (unless scraps-mode (user-error "Not in a scrap"))
-  (kill-new (string-trim (buffer-substring-no-properties (point-min) (point-max))))
-  (message "Copied scrap: %s" (scraps--label (current-buffer))))
+  (let ((buf (or buffer (current-buffer))))
+    (unless (buffer-local-value 'scraps-mode buf) (user-error "Not in a scrap"))
+    (with-current-buffer buf
+      (kill-new (string-trim (buffer-substring-no-properties (point-min) (point-max)))))
+    (message "Copied scrap: %s" (scraps--label buf))))
+
+(defun scraps-copy-number (n)
+  "Copy scrap number N (from 1) whole, as the tab line numbers them."
+  (scraps-copy (or (nth (1- n) (scraps--buffers)) (user-error "No scrap %d" n))))
 
 (defun scraps-close (&optional buffer)
   "Close BUFFER's scrap (this one, interactively): kill it and trash its file."
@@ -297,19 +303,32 @@ The request runs in the background; the title goes in the file and buffer names.
 
 ;;;; F6 menu
 
-(defun scraps--menu-scraps (_children)
-  "Menu entries 1 to 9, one per scrap."
+(defun scraps--numbered (prefix action)
+  "Entries 1 to 9 of menu PREFIX, one per scrap, calling ACTION with its number."
   (transient-parse-suffixes
-   'scraps-menu
+   prefix
    (cl-loop for buf in (scraps--buffers)
             for i from 1 to 9
             collect (let ((i i))
                       (list (number-to-string i) (scraps--label buf)
-                            (lambda () (interactive) (scraps-visit i)))))))
+                            (lambda () (interactive) (funcall action i)))))))
+
+(defun scraps--menu-scraps (_children)
+  "Entries that visit a scrap."
+  (scraps--numbered 'scraps-menu #'scraps-visit))
+
+(defun scraps--copy-menu-scraps (_children)
+  "Entries that copy a scrap."
+  (scraps--numbered 'scraps-copy-menu #'scraps-copy-number))
 
 (defun scraps--in-scrap-p ()
   "Non-nil in a scrap's buffer."
   (bound-and-true-p scraps-mode))
+
+(transient-define-prefix scraps-copy-menu ()
+  "Copy a scrap whole, without visiting it."
+  [["Copy" :class transient-column :setup-children scraps--copy-menu-scraps]]
+  [("c" "This scrap" scraps-copy :if scraps--in-scrap-p)])
 
 (transient-define-prefix scraps-menu ()
   "Scraps: short-lived blocks of text."
@@ -317,8 +336,9 @@ The request runs in the background; the title goes in the file and buffer names.
   [["New"
     ("y" "From the latest copy" scraps-from-kill)
     ("n" "Empty" scraps-new)]
+   ["Copy"
+    ("c" "Copy a scrap..." scraps-copy-menu)]
    ["This scrap"
-    ("c" "Copy all of it" scraps-copy :if scraps--in-scrap-p)
     ("a" "Append the latest copy" scraps-append-kill :if scraps--in-scrap-p)
     ("t" "Retitle" scraps-title :if scraps--in-scrap-p)
     ("k" "Close" scraps-close :if scraps--in-scrap-p)]
